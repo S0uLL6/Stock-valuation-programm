@@ -406,9 +406,11 @@ class ValuationPage(ctk.CTkFrame):
         hdr_row.grid_columnconfigure(0, weight=1)
         lbl(hdr_row, "Портфель", size=13, weight="bold").grid(
             row=0, column=0, sticky="w")
+        self._weight_warn = lbl(hdr_row, "", size=11, color=GOLD)
+        self._weight_warn.grid(row=0, column=1, sticky="e", padx=(0, 8))
         btn(hdr_row, "Очистить", self._clear_portfolio,
             color=RED_D, width=90, height=26).grid(
-            row=0, column=1, sticky="e")
+            row=0, column=2, sticky="e")
 
         COLS   = ["Тикер","Компания","Доля %","Цена","DDM","P/E","RIV","DCF","Справедл.","Потенц.%",""]
         WIDTHS = [65, 180, 65, 75, 85, 85, 85, 85, 90, 85, 36]
@@ -501,6 +503,16 @@ class ValuationPage(ctk.CTkFrame):
     def _append_total_row(self, ri):
         """Добавляет строку «Итого» после всех тикеров."""
         w_upside, weight_sum = self._calc_portfolio_stats()
+        diff = round(weight_sum - 100, 1)
+        if weight_sum == 0:
+            self._weight_warn.configure(text="")
+        elif abs(diff) < 0.1:
+            self._weight_warn.configure(text="✓ 100%", text_color=GREEN)
+        else:
+            sign = "+" if diff > 0 else ""
+            self._weight_warn.configure(
+                text=f"⚠ {weight_sum:.1f}% ({sign}{diff:.1f}%)",
+                text_color=GOLD)
         up_color = GREEN if w_upside > 0 else (RED if w_upside < 0 else MUTED)
         up_str   = f"{w_upside:+.1f}%" if weight_sum else "—"
         wt_str   = f"{weight_sum:.1f}%"
