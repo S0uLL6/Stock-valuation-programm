@@ -305,6 +305,10 @@ class ValuationPage(ctk.CTkFrame):
             color="#1C4A2A", width=200).grid(
             row=2, padx=12, pady=(0,8), sticky="ew")
 
+        btn(p, "Анализ чувствительности", self._show_sensitivity,
+            color=CARD2, width=200).grid(
+            row=19, padx=16, pady=(4,0), sticky="ew")
+
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
             row=20, padx=16, pady=(8,4), sticky="ew")
