@@ -372,8 +372,14 @@ class ValuationPage(ctk.CTkFrame):
         f.grid_columnconfigure(0, weight=1)
         f.grid_rowconfigure(2, weight=1)
 
-        lbl(f, "Портфель", size=13, weight="bold").grid(
-            row=0, pady=(0,8), sticky="w")
+        hdr_row = ctk.CTkFrame(f, fg_color="transparent")
+        hdr_row.grid(row=0, sticky="ew", pady=(0, 8))
+        hdr_row.grid_columnconfigure(0, weight=1)
+        lbl(hdr_row, "Портфель", size=13, weight="bold").grid(
+            row=0, column=0, sticky="w")
+        btn(hdr_row, "Очистить", self._clear_portfolio,
+            color=RED_D, width=90, height=26).grid(
+            row=0, column=1, sticky="e")
 
         COLS   = ["Тикер","Компания","Доля %","Цена","DDM","P/E","RIV","DCF","Справедл.","Потенц.%",""]
         WIDTHS = [65, 180, 65, 75, 85, 85, 85, 85, 90, 85, 36]
@@ -459,6 +465,16 @@ class ValuationPage(ctk.CTkFrame):
         self.portfolio.pop(ticker, None)
         _save_portfolio(self.portfolio)
         self._refresh_table()
+
+    def _clear_portfolio(self):
+        from tkinter import messagebox
+        if not self.portfolio:
+            return
+        if messagebox.askyesno("Очистить портфель",
+                               "Удалить все тикеры из портфеля?"):
+            self.portfolio.clear()
+            _save_portfolio(self.portfolio)
+            self._refresh_table()
 
     # ── Spinner ────────────────────────────────────────────────
     def _start_spinner(self):
