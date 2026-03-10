@@ -719,24 +719,44 @@ def riv_price(d: dict) -> float:
 
 
 def dcf_price(d: dict) -> float:
-    """Упрощённый DCF через EPS.
-    Прогнозируем EPS на T лет с ростом g, затем терминальная стоимость.
-    P = Σ EPS*(1+g)^t / (1+k)^t  +  TV / (1+k)^T
-    TV = EPS_T * (1 + g_term) / (k - g_term),  g_term = min(g, 0.04)
+    """Упрощённый DCF через нормализованный FCF.
+
+    FCF = EPS × payout_ratio  (дивиденды / прибыль, но не >1).
+    Прогнозируем FCF на T лет с ростом g_proj = min(g, 20%),
+    затем терминальная стоимость с g_term = min(g, 4%).
+    Минимальный спред k − g_term ≥ 5% — защита от взрыва TV.
+
+    P = Σ FCF*(1+g_proj)^t / (1+k)^t  +  TV / (1+k)^T
+    TV = FCF_T * (1 + g_term) / (k − g_term)
     """
     eps, g, k = d["eps"], d["g"], d["k"]
     if eps <= 0 or k <= 0:
         return 0.0
+
+    # Fix 1: FCF = EPS × payout_ratio (а не чистый EPS)
+    d0 = d.get("d0", 0.0)
+    if d0 > 0 and eps > 0:
+        payout = min(d0 / eps, 1.0)
+    else:
+        payout = 0.5          # по умолчанию 50%
+    fcf = eps * payout
+
+    # Fix 3: прогнозный рост не выше 20% — защита от гиперроста
+    g_proj = min(g, 0.20)
+
     T      = 7
-    g_term = min(g, 0.04)   # терминальный рост не выше 4%
-    if k <= g_term:
+    # Fix 2: терминальный рост ≤ 4%, а спред (k − g_term) ≥ 5%
+    g_term = min(g, 0.04)
+    if k - g_term < 0.05:
+        g_term = k - 0.05
+    if g_term < 0 or k <= g_term:
         return 0.0
 
-    pv_eps = sum(eps * (1 + g) ** t / (1 + k) ** t for t in range(1, T + 1))
-    eps_T  = eps * (1 + g) ** T
-    tv     = eps_T * (1 + g_term) / (k - g_term)
+    pv_fcf = sum(fcf * (1 + g_proj) ** t / (1 + k) ** t for t in range(1, T + 1))
+    fcf_T  = fcf * (1 + g_proj) ** T
+    tv     = fcf_T * (1 + g_term) / (k - g_term)
     pv_tv  = tv / (1 + k) ** T
-    return pv_eps + pv_tv
+    return pv_fcf + pv_tv
 
 
 # ────────────────────────────────────────────────────────────────
