@@ -408,9 +408,12 @@ class ValuationPage(ctk.CTkFrame):
             row=0, column=0, sticky="w")
         self._weight_warn = lbl(hdr_row, "", size=11, color=GOLD)
         self._weight_warn.grid(row=0, column=1, sticky="e", padx=(0, 8))
+        btn(hdr_row, "Нормировать", self._normalize_weights,
+            color=CARD2, width=110, height=26).grid(
+            row=0, column=2, sticky="e", padx=(0, 6))
         btn(hdr_row, "Очистить", self._clear_portfolio,
             color=RED_D, width=90, height=26).grid(
-            row=0, column=2, sticky="e")
+            row=0, column=3, sticky="e")
 
         COLS   = ["Тикер","Компания","Доля %","Цена","DDM","P/E","RIV","DCF","Справедл.","Потенц.%",""]
         WIDTHS = [65, 180, 65, 75, 85, 85, 85, 85, 90, 85, 36]
@@ -541,6 +544,18 @@ class ValuationPage(ctk.CTkFrame):
 
     def _remove(self, ticker):
         self.portfolio.pop(ticker, None)
+        _save_portfolio(self.portfolio)
+        self._refresh_table()
+
+    def _normalize_weights(self):
+        """Приводит все веса к 100%, пропорционально."""
+        _, weight_sum = self._calc_portfolio_stats()
+        if not weight_sum:
+            return
+        for d in self.portfolio.values():
+            w = d.get("weight")
+            if isinstance(w, (int, float)) and w > 0:
+                d["weight"] = round(w / weight_sum * 100, 1)
         _save_portfolio(self.portfolio)
         self._refresh_table()
 
