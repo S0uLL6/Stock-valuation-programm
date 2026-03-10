@@ -209,6 +209,22 @@ class ValuationPage(ctk.CTkFrame):
         self._build()
         if self.portfolio:
             self.after(200, self._refresh_table)
+            threading.Thread(target=self._refresh_portfolio_prices,
+                             daemon=True).start()
+
+    def _refresh_portfolio_prices(self):
+        """Обновляет цены всех тикеров в портфеле (фон, при старте)."""
+        for ticker, d in list(self.portfolio.items()):
+            try:
+                new_price = moex_price(ticker)
+                if new_price > 0:
+                    d["price"] = new_price
+                    if d.get("avg", 0) > 0:
+                        d["upside"] = round((d["avg"] / new_price - 1) * 100, 1)
+            except Exception:
+                pass
+        _save_portfolio(self.portfolio)
+        self.after(0, self._refresh_table)
 
     def _build(self):
         self.grid_columnconfigure(0, weight=0, minsize=300)
