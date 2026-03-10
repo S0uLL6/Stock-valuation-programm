@@ -547,6 +547,34 @@ class ValuationPage(ctk.CTkFrame):
     def _status(self, msg, color=MUTED):
         self.status_lbl.configure(text=msg, text_color=color)
 
+    def _toggle_auto(self):
+        self._auto_on = not self._auto_on
+        if self._auto_on:
+            self._auto_btn.configure(text="⟳ Авто: вкл", fg_color=ACCENT)
+            self._do_auto_update()
+        else:
+            self._auto_btn.configure(text="⟳ Авто: выкл", fg_color=CARD2)
+            if self._auto_job:
+                self.after_cancel(self._auto_job)
+                self._auto_job = None
+
+    def _do_auto_update(self):
+        if not self._auto_on:
+            return
+        ticker = self.ticker_e.get().strip().upper().replace(".ME", "")
+        if ticker:
+            def worker():
+                try:
+                    price = moex_price(ticker)
+                    if price > 0:
+                        self.after(0, lambda: self._apply_auto_price(ticker, price))
+                except Exception:
+                    pass
+            threading.Thread(target=worker, daemon=True).start()
+        interval_map = {"1м": 60_000, "5м": 300_000, "10м": 600_000}
+        ms = interval_map.get(self._interval_var.get(), 300_000)
+        self._auto_job = self.after(ms, self._do_auto_update)
+
     def _pick_pdf(self):
         p = filedialog.askopenfilename(
             filetypes=[("PDF", "*.pdf")], title="Выбери МСФО отчёт")
