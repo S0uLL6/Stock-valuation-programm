@@ -748,33 +748,33 @@
 </div>
 
 <!-- 14 -->
-<div class="task status-waiting" onclick="toggle(this)">
+<div class="task status-done" onclick="toggle(this)">
   <div class="task-header">
     <div class="task-num">14</div>
     <div class="task-title">Текущий P/E компании vs отраслевой P/E</div>
-    <span class="task-status-badge">Ожидает</span>
+    <span class="task-status-badge">Завершено</span>
     <span class="task-arrow">▼</span>
   </div>
   <div class="subtasks">
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">14.1 — Вычисление текущего P/E = Цена / EPS после расчёта</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">14.1 — cur_pe = Цена / EPS, sector_pe = get_sector_pe(), оба сохранены в self.data</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">14.2 — Мини-карточка «P/E текущий vs отраслевой» в секции результатов</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">14.2 — Мини-карточка под 4 моделями: P/E текущий | P/E отраслевой | Оценка</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">14.3 — Цвет: зелёный если P/E_компании &lt; P/E_отрасли, красный иначе</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">14.3 — Зелёный «▼ ниже отрасли на Xx» / красный «▲ выше отрасли на Xx»</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">14.4 — Добавить P/E в строку Excel-экспорта</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">14.4 — Колонка «Тек.P/E» добавлена в Excel между EPS и Отр.P/E</div>
+      <span class="sub-tag">Done</span>
     </div>
   </div>
 </div>
