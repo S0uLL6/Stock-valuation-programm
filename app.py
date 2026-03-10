@@ -1222,6 +1222,24 @@ class AnalyticsPage(ctk.CTkFrame):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  Страница 3 — Настройки
+# ═══════════════════════════════════════════════════════════════
+class SettingsPage(ctk.CTkFrame):
+    def __init__(self, parent, app, **kw):
+        super().__init__(parent, fg_color=BG, **kw)
+        self.app = app
+        self._build()
+
+    def _build(self):
+        wrap = ctk.CTkFrame(self, fg_color="transparent")
+        wrap.pack(padx=40, pady=40, anchor="nw")
+
+        lbl(wrap, "Настройки", size=22, weight="bold").pack(anchor="w")
+        lbl(wrap, "Параметры ставок дисконтирования",
+            size=13, color=MUTED).pack(anchor="w", pady=(4, 0))
+
+
+# ═══════════════════════════════════════════════════════════════
 #  Главное окно
 # ═══════════════════════════════════════════════════════════════
 class App(ctk.CTk):
@@ -1247,7 +1265,8 @@ class App(ctk.CTk):
         bf = ctk.CTkFrame(nav, fg_color="transparent")
         bf.pack(side="left", padx=16)
         for key, name in [("valuation","Оценка"),
-                           ("analytics","График & Дивиденды")]:
+                           ("analytics","График & Дивиденды"),
+                           ("settings", "Настройки")]:
             b = ctk.CTkButton(
                 bf, text=name, width=180, height=32,
                 fg_color="transparent", hover_color=CARD2,
@@ -1265,12 +1284,14 @@ class App(ctk.CTk):
 
         self.analytics_page = AnalyticsPage(c)
         self.valuation_page  = ValuationPage(c, app=self)
-        for p in (self.valuation_page, self.analytics_page):
+        self.settings_page   = SettingsPage(c, app=self)
+        for p in (self.valuation_page, self.analytics_page, self.settings_page):
             p.grid(row=0, column=0, sticky="nsew")
 
     def _show_page(self, key):
         {"valuation": self.valuation_page,
-         "analytics": self.analytics_page}[key].tkraise()
+         "analytics": self.analytics_page,
+         "settings":  self.settings_page}[key].tkraise()
         for k, b in self.nav_btns.items():
             b.configure(fg_color=CARD2 if k==key else "transparent",
                         text_color=TEXT  if k==key else MUTED)
