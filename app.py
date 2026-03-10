@@ -659,6 +659,113 @@ class ValuationPage(ctk.CTkFrame):
                      "avg":avg,"upside":upside}
         self._status(f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%", GREEN)
 
+    def _show_sensitivity(self):
+        if not self.data:
+            self._status("Сначала рассчитай", RED)
+            return
+
+        d = self.data
+        cur_g = d["g"]
+        cur_k = d["k"]
+
+        # Сетки значений
+        g_vals = [round(0.03 + i * 0.025, 3) for i in range(7)]  # 3%–18%
+        k_vals = [round(0.12 + i * 0.03,  3) for i in range(7)]  # 12%–33%
+
+        # Расчёт средней справедливой цены для каждой комбинации g×k
+        def fair(g, k):
+            dd = dict(d, g=g, k=k,
+                      d1=d["d0"] * (1 + g),
+                      pv_ri=sum((d["roe"] - k) * d["bvps"] / (1 + k) ** t
+                                for t in range(1, 6)))
+            vals = [v for v in [ddm_price(dd), pe_price(dd),
+                                riv_price(dd), dcf_price(dd)] if v > 0]
+            return sum(vals) / len(vals) if vals else 0
+
+        matrix = [[fair(g, k) for k in k_vals] for g in g_vals]
+        price  = d["price"]
+
+        # ── Popup окно ─────────────────────────────────────────
+        win = tk.Toplevel(self)
+        win.title(f"Анализ чувствительности — {d['ticker']}")
+        win.configure(bg=CARD)
+        win.resizable(False, False)
+
+        tk.Label(win, text=f"Справедливая цена  {d['ticker']}  (текущая цена {price:.0f} ₽)",
+                 bg=CARD, fg=TEXT, font=("SF Pro Display", 13, "bold")).pack(
+                 padx=20, pady=(16, 4))
+        tk.Label(win,
+                 text="Строки — рост дивидендов g      Столбцы — ставка дисконтирования k",
+                 bg=CARD, fg=MUTED, font=("SF Pro Display", 10)).pack(padx=20, pady=(0, 10))
+
+        # ── Heatmap через matplotlib ────────────────────────────
+        fig, ax = plt.subplots(figsize=(9, 5.5))
+        fig.patch.set_facecolor(CARD)
+        ax.set_facecolor(CARD2)
+
+        import matplotlib.colors as mcolors
+        upside_matrix = [[(fair(g, k) / price - 1) * 100
+                          for k in k_vals] for g in g_vals]
+        data_np = np.array(upside_matrix)
+
+        # Цветовая карта: красный (−50%) → белый (0%) → зелёный (+50%)
+        cmap = mcolors.LinearSegmentedColormap.from_list(
+            "rg", ["#8B0000", "#2D1017", CARD2, GREEN_D, "#005000"], N=256)
+        vmax = max(abs(data_np.min()), abs(data_np.max()), 20)
+        im = ax.imshow(data_np, cmap=cmap, vmin=-vmax, vmax=vmax, aspect="auto")
+
+        ax.set_xticks(range(len(k_vals)))
+        ax.set_xticklabels([f"{k*100:.0f}%" for k in k_vals],
+                           color=MUTED, fontsize=9)
+        ax.set_yticks(range(len(g_vals)))
+        ax.set_yticklabels([f"{g*100:.0f}%" for g in g_vals],
+                           color=MUTED, fontsize=9)
+        ax.set_xlabel("k — ставка дисконтирования", color=MUTED, fontsize=10)
+        ax.set_ylabel("g — рост дивидендов", color=MUTED, fontsize=10)
+        ax.tick_params(colors=MUTED)
+        for sp in ax.spines.values():
+            sp.set_color(BORDER)
+
+        # Текст в ячейках
+        for i, g in enumerate(g_vals):
+            for j, k in enumerate(k_vals):
+                val  = matrix[i][j]
+                upsd = upside_matrix[i][j]
+                clr  = "#FFFFFF" if abs(upsd) > 15 else TEXT
+                ax.text(j, i, f"{val:.0f}\n{upsd:+.0f}%",
+                        ha="center", va="center", fontsize=8,
+                        color=clr, fontweight="bold")
+
+        # Рамка текущих параметров
+        try:
+            ci = min(range(len(k_vals)), key=lambda j: abs(k_vals[j] - cur_k))
+            ri = min(range(len(g_vals)), key=lambda i: abs(g_vals[i] - cur_g))
+            rect = plt.Rectangle((ci - 0.5, ri - 0.5), 1, 1,
+                                  fill=False, edgecolor=GOLD,
+                                  linewidth=2.5, zorder=5)
+            ax.add_patch(rect)
+            ax.text(ci, ri - 0.55, "◆ текущие",
+                    ha="center", va="top", fontsize=7,
+                    color=GOLD, fontweight="bold")
+        except Exception:
+            pass
+
+        cbar = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
+        cbar.set_label("Потенциал, %", color=MUTED, fontsize=9)
+        cbar.ax.yaxis.set_tick_params(color=MUTED)
+        plt.setp(cbar.ax.yaxis.get_ticklabels(), color=MUTED)
+
+        fig.tight_layout(pad=1.5)
+
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.get_tk_widget().pack(padx=10, pady=(0, 12))
+        canvas.draw()
+
+        tk.Button(win, text="Закрыть", command=win.destroy,
+                  bg=CARD2, fg=TEXT, relief="flat",
+                  font=("SF Pro Display", 11),
+                  padx=20, pady=6).pack(pady=(0, 14))
+
     def _add_to_portfolio(self):
         if not self.data:
             self._status("Сначала рассчитай", RED)
