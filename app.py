@@ -309,12 +309,16 @@ class ValuationPage(ctk.CTkFrame):
             color=CARD2, width=200).grid(
             row=19, padx=16, pady=(4,0), sticky="ew")
 
+        btn(p, "Сценарный анализ", self._show_scenarios,
+            color=CARD2, width=200).grid(
+            row=20, padx=16, pady=(4,0), sticky="ew")
+
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
-            row=20, padx=16, pady=(8,4), sticky="ew")
+            row=21, padx=16, pady=(8,4), sticky="ew")
 
         self.status_lbl = lbl(p, "", size=11, color=MUTED)
-        self.status_lbl.grid(row=21, padx=16, pady=(4,12), sticky="w")
+        self.status_lbl.grid(row=22, padx=16, pady=(4,12), sticky="w")
 
     # ── Карточки результатов ───────────────────────────────────
     def _build_results(self):
