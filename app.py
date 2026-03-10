@@ -552,7 +552,7 @@ class ValuationPage(ctk.CTkFrame):
         g    = self._fval("g",   0.08)
         beta = self._fval("beta", 1.0)
 
-        r_f    = 0.16; r_m = 0.22
+        r_f    = CONFIG["r_f"]; r_m = CONFIG["r_m"]
         r_capm = r_f + beta * (r_m - r_f)
         d1     = d0 * (1 + g)
         r_ddm  = (d1/price + g) if price and d1 else r_capm
@@ -1376,6 +1376,9 @@ class App(ctk.CTk):
         for k, b in self.nav_btns.items():
             b.configure(fg_color=CARD2 if k==key else "transparent",
                         text_color=TEXT  if k==key else MUTED)
+
+    def _refresh_rates_label(self):
+        pass  # будет реализовано в 1.5
 
 
 if __name__ == "__main__":
