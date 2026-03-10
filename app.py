@@ -1088,6 +1088,38 @@ class ValuationPage(ctk.CTkFrame):
         wb.save(path)
         self._status(f"✓ {os.path.basename(path)}", GREEN)
 
+    def _export_csv(self):
+        import csv
+        items = {**self.portfolio}
+        if self.data:
+            items[self.data["ticker"]] = self.data
+        if not items:
+            self._status("Нет данных", RED)
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv", initialfile="portfolio.csv",
+            filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        cols = [
+            ("Тикер",           lambda d: d.get("ticker", "")),
+            ("Компания",        lambda d: d.get("name", "")),
+            ("Доля %",          lambda d: d.get("weight", "")),
+            ("Цена",            lambda d: d.get("price", "")),
+            ("DDM",             lambda d: d.get("ddm", "")),
+            ("P/E",             lambda d: d.get("cmp", "")),
+            ("RIV",             lambda d: d.get("riv", "")),
+            ("DCF",             lambda d: d.get("dcf", "")),
+            ("Справедл. цена",  lambda d: d.get("avg", "")),
+            ("Потенциал %",     lambda d: d.get("upside", "")),
+        ]
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f, delimiter=";")
+            writer.writerow([c[0] for c in cols])
+            for d in items.values():
+                writer.writerow([c[1](d) for c in cols])
+        self._status(f"✓ {os.path.basename(path)}", GREEN)
+
 
 # ═══════════════════════════════════════════════════════════════
 #  Страница 2 — Аналитика
