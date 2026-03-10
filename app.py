@@ -482,6 +482,19 @@ class ValuationPage(ctk.CTkFrame):
                         anchor="w", padx=6)
                     cl.grid(row=ri, column=ci, sticky="ew", ipady=4)
 
+    def _calc_portfolio_stats(self):
+        """Возвращает (weighted_upside, total_weight) по портфелю."""
+        weighted_sum = 0.0
+        weight_sum   = 0.0
+        for d in self.portfolio.values():
+            w  = d.get("weight")
+            up = d.get("upside", 0)
+            if isinstance(w, (int, float)) and w > 0:
+                weighted_sum += up * w
+                weight_sum   += w
+        w_upside = weighted_sum / weight_sum if weight_sum else 0
+        return w_upside, weight_sum
+
     def _update_weight(self, ticker, entry_widget):
         try:
             val = float(entry_widget.get().replace("%","").strip())
