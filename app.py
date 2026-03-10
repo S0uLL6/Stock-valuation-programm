@@ -1356,9 +1356,13 @@ class SettingsPage(ctk.CTkFrame):
             self._status_lbl.configure(
                 text="Ошибка: введи числа (например 0.16)", text_color=RED)
             return
-        if not (0 < r_f < 1) or not (0 < r_m < 1):
+        if not (0 < r_f < 1):
             self._status_lbl.configure(
-                text="Значения должны быть от 0 до 1", text_color=RED)
+                text="r_f должна быть от 0 до 1 (ставка ЦБ не бывает отрицательной)", text_color=RED)
+            return
+        if not (-1 < r_m < 10):
+            self._status_lbl.configure(
+                text="r_m вне разумного диапазона (от -100% до +1000%)", text_color=RED)
             return
         CONFIG["r_f"] = r_f
         CONFIG["r_m"] = r_m
