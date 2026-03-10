@@ -770,6 +770,139 @@ class ValuationPage(ctk.CTkFrame):
                   font=("SF Pro Display", 11),
                   padx=20, pady=6).pack(pady=(0, 14))
 
+    def _show_scenarios(self):
+        if not self.data:
+            self._status("Сначала рассчитай", RED)
+            return
+
+        d = self.data
+        price = d["price"]
+
+        # Пресеты сценариев: (название, иконка, цвет, множитель g, множитель k)
+        SCENARIOS = [
+            ("Медведь", "🐻", RED,   0.5,  1.2),
+            ("База",    "—",  MUTED, 1.0,  1.0),
+            ("Бык",     "🐂", GREEN, 1.5,  0.85),
+        ]
+
+        win = tk.Toplevel(self)
+        win.title(f"Сценарный анализ — {d['ticker']}")
+        win.configure(bg=CARD)
+        win.resizable(False, False)
+
+        # Заголовок
+        tk.Label(win, text=f"Сценарный анализ  {d['ticker']}",
+                 bg=CARD, fg=TEXT,
+                 font=("SF Pro Display", 14, "bold")).grid(
+            row=0, column=0, columnspan=3, padx=20, pady=(16, 4))
+        tk.Label(win, text=f"Текущая цена: {price:.2f} ₽",
+                 bg=CARD, fg=MUTED,
+                 font=("SF Pro Display", 11)).grid(
+            row=1, column=0, columnspan=3, padx=20, pady=(0, 12))
+
+        # Хранилище Entry и Label виджетов для каждого сценария
+        scenario_widgets = []
+
+        for col, (name, icon, color, g_mult, k_mult) in enumerate(SCENARIOS):
+            g_preset = round(d["g"] * g_mult * 100, 1)
+            k_preset = round(d["k"] * k_mult * 100, 1)
+
+            frame = tk.Frame(win, bg=CARD2, relief="flat",
+                             highlightbackground=color,
+                             highlightthickness=2)
+            frame.grid(row=2, column=col, padx=10, pady=(0, 10),
+                       sticky="nsew", ipadx=10, ipady=10)
+
+            # Название
+            tk.Label(frame, text=f"{icon} {name}",
+                     bg=CARD2, fg=color,
+                     font=("SF Pro Display", 13, "bold")).pack(pady=(10, 6))
+
+            # g
+            tk.Label(frame, text="g, % (рост дивидендов)",
+                     bg=CARD2, fg=MUTED,
+                     font=("SF Pro Display", 10)).pack()
+            g_var = tk.StringVar(value=str(g_preset))
+            g_entry = tk.Entry(frame, textvariable=g_var, width=10,
+                               bg=CARD, fg=TEXT, insertbackground=TEXT,
+                               relief="flat", font=("SF Pro Display", 12),
+                               justify="center")
+            g_entry.pack(pady=(2, 8))
+
+            # k
+            tk.Label(frame, text="k, % (ставка дисконт.)",
+                     bg=CARD2, fg=MUTED,
+                     font=("SF Pro Display", 10)).pack()
+            k_var = tk.StringVar(value=str(k_preset))
+            k_entry = tk.Entry(frame, textvariable=k_var, width=10,
+                               bg=CARD, fg=TEXT, insertbackground=TEXT,
+                               relief="flat", font=("SF Pro Display", 12),
+                               justify="center")
+            k_entry.pack(pady=(2, 8))
+
+            # Результаты
+            tk.Label(frame, text="Справедливая цена",
+                     bg=CARD2, fg=MUTED,
+                     font=("SF Pro Display", 10)).pack(pady=(6, 0))
+            fair_lbl = tk.Label(frame, text="—",
+                                bg=CARD2, fg=TEXT,
+                                font=("SF Pro Display", 14, "bold"))
+            fair_lbl.pack()
+
+            upside_lbl = tk.Label(frame, text="",
+                                  bg=CARD2, fg=MUTED,
+                                  font=("SF Pro Display", 12))
+            upside_lbl.pack(pady=(2, 10))
+
+            scenario_widgets.append((g_var, k_var, fair_lbl, upside_lbl))
+
+        def _calc_scenarios():
+            for g_var, k_var, fair_lbl, upside_lbl in scenario_widgets:
+                try:
+                    g_val = float(g_var.get().replace(",", ".")) / 100
+                    k_val = float(k_var.get().replace(",", ".")) / 100
+                except ValueError:
+                    fair_lbl.configure(text="ошибка", fg=RED)
+                    upside_lbl.configure(text="")
+                    continue
+                dd = dict(d, g=g_val, k=k_val,
+                          d1=d["d0"] * (1 + g_val),
+                          pv_ri=sum((d["roe"] - k_val) * d["bvps"] / (1 + k_val) ** t
+                                    for t in range(1, 6)))
+                vals = [v for v in [
+                    ddm_price(dd), pe_price(dd), riv_price(dd), dcf_price(dd)
+                ] if v > 0]
+                avg = sum(vals) / len(vals) if vals else 0
+                if avg <= 0:
+                    fair_lbl.configure(text="—", fg=TEXT)
+                    upside_lbl.configure(text="")
+                    continue
+                upside = (avg / price - 1) * 100
+                fair_lbl.configure(text=f"{avg:.2f} ₽", fg=TEXT)
+                up_color = GREEN if upside >= 0 else RED
+                arrow = "▲" if upside >= 0 else "▼"
+                upside_lbl.configure(
+                    text=f"{arrow} {upside:+.1f}%", fg=up_color)
+
+        # Кнопки
+        btn_frame = tk.Frame(win, bg=CARD)
+        btn_frame.grid(row=3, column=0, columnspan=3, pady=(0, 14))
+
+        tk.Button(btn_frame, text="Рассчитать",
+                  command=_calc_scenarios,
+                  bg=ACCENT, fg=TEXT, relief="flat",
+                  font=("SF Pro Display", 11),
+                  padx=18, pady=6).pack(side="left", padx=8)
+
+        tk.Button(btn_frame, text="Закрыть",
+                  command=win.destroy,
+                  bg=CARD2, fg=TEXT, relief="flat",
+                  font=("SF Pro Display", 11),
+                  padx=18, pady=6).pack(side="left", padx=8)
+
+        # Сразу считаем при открытии
+        _calc_scenarios()
+
     def _add_to_portfolio(self):
         if not self.data:
             self._status("Сначала рассчитай", RED)
