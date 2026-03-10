@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Valuation — Plan</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0D1117;
+    color: #E6EDF3;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    padding: 40px 32px;
+    min-height: 100vh;
+  }
+
+  /* ── Шапка ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 36px;
+  }
+  .logo {
+    width: 64px; height: 64px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #58A6FF 0%, #BC8CFF 50%, #3FB950 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 24px rgba(88,166,255,0.25);
+  }
+  .header-text h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-text p  { color: #8B949E; font-size: 14px; margin-top: 4px; }
+
+  /* ── Прогресс ── */
+  .progress-card {
+    background: #161B22;
+    border: 1px solid #30363D;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 28px;
+  }
+  .progress-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .progress-top span:first-child { color: #8B949E; font-size: 14px; }
+  .progress-pct { font-size: 18px; font-weight: 700; color: #E6EDF3; }
+  .progress-bar-bg {
+    background: #21262D;
+    border-radius: 8px;
+    height: 10px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #58A6FF, #BC8CFF);
+    transition: width 0.6s ease;
+  }
+  .progress-legend {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .dot-done    { background: #3FB950; }
+  .dot-active  { background: #E3B341; }
+  .dot-waiting { background: #58A6FF; }
+
+  /* ── Легенда статусов ── */
+  .status-legend {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+  }
+  .badge-done    { background: rgba(63,185,80,0.15); color: #3FB950; border: 1px solid rgba(63,185,80,0.35); }
+  .badge-active  { background: rgba(227,179,65,0.15); color: #E3B341; border: 1px solid rgba(227,179,65,0.35); }
+  .badge-waiting { background: rgba(88,166,255,0.1);  color: #58A6FF; border: 1px solid rgba(88,166,255,0.25); }
+  .badge-hint    { background: rgba(188,140,255,0.1); color: #BC8CFF; border: 1px solid rgba(188,140,255,0.25); margin-left: auto; }
+
+  /* ── Задача ── */
+  .task {
+    border-radius: 14px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .task.status-done    { border-color: rgba(63,185,80,0.4);   background: rgba(13,40,24,0.7); }
+  .task.status-active  { border-color: rgba(227,179,65,0.4);  background: rgba(45,32,8,0.7); }
+  .task.status-waiting { border-color: rgba(88,166,255,0.2);  background: rgba(22,27,34,0.9); }
+
+  .task-header {
+    display: flex;
+    align-items: center;
+    padding: 18px 22px;
+    cursor: pointer;
+    user-select: none;
+    gap: 16px;
+    transition: background 0.15s;
+  }
+  .task-header:hover { background: rgba(255,255,255,0.03); }
+
+  .task-num {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .status-done  .task-num  { background: rgba(63,185,80,0.25);  color: #3FB950; }
+  .status-active .task-num { background: rgba(227,179,65,0.25); color: #E3B341; }
+  .status-waiting .task-num{ background: rgba(88,166,255,0.15); color: #58A6FF; }
+
+  .task-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: #E6EDF3;
+  }
+  .task-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+  .status-done  .task-status-badge { background: rgba(63,185,80,0.2);  color: #3FB950; }
+  .status-active .task-status-badge{ background: rgba(227,179,65,0.2); color: #E3B341; }
+  .status-waiting .task-status-badge{ background: rgba(88,166,255,0.12); color: #58A6FF; }
+
+  .task-arrow {
+    font-size: 12px;
+    color: #8B949E;
+    transition: transform 0.25s;
+    flex-shrink: 0;
+  }
+  .task.open .task-arrow { transform: rotate(180deg); }
+
+  /* ── Подзадачи ── */
+  .subtasks {
+    display: none;
+    padding: 0 22px 16px 22px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .task.open .subtasks { display: flex; }
+
+  .subtask {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.15s;
+  }
+  .subtask:hover { background: rgba(255,255,255,0.04); }
+
+  .sub-check {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .sub-done    .sub-check { background: #238636; color: #fff; }
+  .sub-active  .sub-check { background: rgba(227,179,65,0.25); color: #E3B341; border: 1px solid rgba(227,179,65,0.5); }
+  .sub-waiting .sub-check { background: rgba(88,166,255,0.1);  color: #58A6FF; border: 1px solid rgba(88,166,255,0.3); }
+
+  .sub-text {
+    flex: 1;
+    font-size: 13px;
+    color: #C9D1D9;
+    line-height: 1.4;
+  }
+  .sub-done .sub-text { color: #8B949E; }
+
+  .sub-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    padding: 3px 10px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .sub-done .sub-tag    { background: rgba(35,134,54,0.3);   color: #3FB950; }
+  .sub-active .sub-tag  { background: rgba(227,179,65,0.2);  color: #E3B341; }
+  .sub-waiting .sub-tag { background: rgba(88,166,255,0.1);  color: #58A6FF; }
+
+  .priority-high   { border-left: 3px solid #F85149; }
+  .priority-medium { border-left: 3px solid #E3B341; }
+  .priority-low    { border-left: 3px solid #58A6FF; }
+
+  /* ── Секции ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #8B949E;
+    margin: 28px 0 12px 4px;
+  }
+
+  /* ── Футер ── */
+  .footer {
+    margin-top: 40px;
+    text-align: center;
+    color: #484F58;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Шапка -->
+<div class="header">
+  <div class="logo">📈</div>
+  <div class="header-text">
+    <h1>Stock Valuation — Roadmap</h1>
+    <p>Task Board — план улучшений десктопного приложения оценки акций</p>
+  </div>
+</div>
+
+<!-- Прогресс -->
+<div class="progress-card">
+  <div class="progress-top">
+    <span>Общий прогресс</span>
+    <span class="progress-pct" id="pct">0%</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="bar" style="width:0%"></div>
+  </div>
+  <div class="progress-legend">
+    <span><span class="legend-dot dot-done"></span><span id="cnt-done">0</span> завершено</span>
+    <span><span class="legend-dot dot-active"></span><span id="cnt-active">0</span> в работе</span>
+    <span><span class="legend-dot dot-waiting"></span><span id="cnt-waiting">0</span> ожидает</span>
+  </div>
+</div>
+
+<!-- Легенда -->
+<div class="status-legend">
+  <span class="badge badge-done">✓ Завершено</span>
+  <span class="badge badge-active">⟳ В процессе</span>
+  <span class="badge badge-waiting">○ Ожидает</span>
+  <span class="badge badge-hint">Нажми на задачу чтобы раскрыть подзадачи</span>
+</div>
+
+<!-- ───────────────── БЛОК: Высокий приоритет ───────────────── -->
+<div class="section-label">🔥 Высокий приоритет</div>
+
+<!-- 1 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">1</div>
+    <div class="task-title">Настройки ставок дисконтирования (r_f, r_m)</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.1 — Добавить страницу «Настройки» в nav-бар (новая вкладка)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.2 — Поля ввода: r_f (ключевая ставка ЦБ) и r_m (целевая доходность рынка)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.3 — Сохранение настроек в config.json рядом со скриптом</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.4 — Передача настроек в расчёты app.py (_calculate) и stock_valuation.py (fetch_moex)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.5 — Отображение текущих r_f / r_m в nav-баре рядом с названием</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">1.6 — Кнопка «Сбросить к умолчаниям» (16% / 22%)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">2</div>
+    <div class="task-title">Сохранение портфеля между сессиями</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">2.1 — Сериализация портфеля в portfolio_state.json при каждом изменении</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">2.2 — Загрузка сохранённого портфеля при запуске приложения</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">2.3 — Обновление цен загруженных тикеров при старте (фоновый поток)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">2.4 — Кнопка «Очистить портфель» с подтверждением</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">3</div>
+    <div class="task-title">Анализ чувствительности (sensitivity table)</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">3.1 — UI: кнопка «Чувствительность» под карточками результатов</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">3.2 — Расчёт сетки: g от 3% до 18% × k от 12% до 30% (7×7 ячеек)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">3.3 — Тепловая карта matplotlib: зелёный (недооценена) → красный (переоценена)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">3.4 — Подсветка ячейки с текущими параметрами (g, k) рамкой</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">3.5 — Отображение в отдельном popup-окне (Toplevel)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">4</div>
+    <div class="task-title">Объём торгов на графике цены</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">4.1 — Извлечь поле volume из свечей MOEX ISS в _fetch_candles_all()</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">4.2 — Добавить sub-plot (20% высоты) с барами объёма под ценой</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">4.3 — Цвет баров: зелёный если close > open, красный иначе</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">4.4 — Синхронизировать hover-аннотацию: добавить объём в тултип</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">4.5 — Чекбокс «Показать объём» для скрытия sub-plot</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">5</div>
+    <div class="task-title">SMA / EMA на графике цены</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">5.1 — Панель переключателей: SMA 20, SMA 50, SMA 200, EMA 20</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">5.2 — Расчёт скользящих средних из _all_closes (numpy/pandas)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">5.3 — Отрисовка поверх ценового графика с цветовым кодированием</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">5.4 — Добавить значение SMA в hover-тултип</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">5.5 — Сохранять выбранные индикаторы между сессиями (в config.json)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── БЛОК: Средний приоритет ───────────────── -->
+<div class="section-label">🟡 Средний приоритет</div>
+
+<!-- 6 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">6</div>
+    <div class="task-title">Сценарный анализ (bull / base / bear)</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">6.1 — UI: раскрывающаяся секция «Сценарии» под полями ввода</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">6.2 — 3 набора параметров (g, ROE): автозаполнение ±30% от базового</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">6.3 — Расчёт справедливой цены для каждого сценария по всем 4 моделям</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">6.4 — Горизонтальные бары с диапазонами: 🐂 / ⚖️ / 🐻</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">6.5 — Маркер текущей цены на шкале диапазонов</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 7 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">7</div>
+    <div class="task-title">Автообновление цены в реальном времени</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">7.1 — Кнопка-тоггл «⟳ Авто» с выбором интервала (1 / 5 / 10 мин)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">7.2 — Background thread: периодический запрос moex_price() без блокировки UI</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">7.3 — Обновление только цены и пересчёт upside без полной перезагрузки</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">7.4 — Индикатор «Обновлено: 14:32:05» в статус-строке</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">7.5 — Flash-эффект (мигание) при изменении цены</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 8 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">8</div>
+    <div class="task-title">Сравнение двух тикеров на одном графике</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.1 — Поле «Сравнить с:» на странице аналитики</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.2 — Загрузка дневных свечей второго тикера (фоновый поток)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.3 — Нормализация обоих рядов к базе 100% на дату начала периода</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.4 — Отрисовка двух линий разными цветами + легенда</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.5 — Переключатель «Абсолют / Норм» (абсолютные цены vs нормализованные)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">8.6 — Кнопка «Убрать сравнение»</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 9 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">9</div>
+    <div class="task-title">Страница «Скрининг» — пакетная оценка тикеров</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.1 — Новая вкладка «Скрининг» в nav-баре</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.2 — Поле ввода тикеров через запятую + кнопка «Импорт из портфеля»</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.3 — Параллельная загрузка данных (ThreadPoolExecutor, max 5 потоков)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.4 — Таблица результатов: тикер / цена / справедливая цена / upside / сектор</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.5 — Сортировка таблицы по любой колонке</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.6 — Прогресс-бар «Загружено X из N тикеров»</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">9.7 — Клик по строке → переход к тикеру на странице «Оценка»</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────── БЛОК: Малые улучшения ───────────────── -->
+<div class="section-label">🟢 Малые улучшения</div>
+
+<!-- 10 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">10</div>
+    <div class="task-title">Индикатор ставки ЦБ в шапке приложения</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">10.1 — Блок в nav-баре: «r_f: 16.0%  r_m: 22.0%» справа</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">10.2 — Клик по блоку → открывает страницу настроек</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">10.3 — Подтягивать реальную ставку ЦБ с сайта (cbr.ru API или парсинг)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 11 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">11</div>
+    <div class="task-title">Взвешенная доходность портфеля</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">11.1 — Расчёт weighted upside: Σ(upside_i × weight_i) / Σ(weight_i)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">11.2 — Строка «Итого» в нижней части таблицы портфеля</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">11.3 — Предупреждение если сумма весов ≠ 100% (жёлтый индикатор)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">11.4 — Кнопка «Нормировать» — автоматически привести веса к 100%</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 12 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">12</div>
+    <div class="task-title">CSV-экспорт портфеля</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">12.1 — Кнопка «Экспорт CSV» рядом с «Экспорт Excel»</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">12.2 — Формирование CSV: те же колонки что в Excel (utf-8-bom для Excel на Windows)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">12.3 — Диалог выбора пути сохранения</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 13 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">13</div>
+    <div class="task-title">Кнопка «Очистить поля»</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">13.1 — Кнопка «✕ Сбросить» под полями EPS / BVPS / ROE / g / beta</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">13.2 — Очистка карточек результатов (DDM / P/E / RIV / DCF → «—»)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">13.3 — Сброс PDF (pdf_path = None, метка «PDF: не выбран»)</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">13.4 — Сброс _loaded_price / _loaded_d0 / _loaded_name</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<!-- 14 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">14</div>
+    <div class="task-title">Текущий P/E компании vs отраслевой P/E</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">14.1 — Вычисление текущего P/E = Цена / EPS после расчёта</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">14.2 — Мини-карточка «P/E текущий vs отраслевой» в секции результатов</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">14.3 — Цвет: зелёный если P/E_компании &lt; P/E_отрасли, красный иначе</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">14.4 — Добавить P/E в строку Excel-экспорта</div>
+      <span class="sub-tag">Ожидает</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Stock Valuation App — Roadmap v1.0 &nbsp;·&nbsp; обновляется по мере работы
+</div>
+
+<script>
+  function toggle(el) {
+    el.classList.toggle('open');
+  }
+
+  function calcProgress() {
+    const subs = document.querySelectorAll('.subtask');
+    const done = document.querySelectorAll('.subtask.sub-done').length;
+    const active = document.querySelectorAll('.subtask.sub-active').length;
+    const waiting = document.querySelectorAll('.subtask.sub-waiting').length;
+    const total = subs.length;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+    document.getElementById('pct').textContent = pct + '%';
+    document.getElementById('bar').style.width = pct + '%';
+
+    // Считаем задачи по статусу
+    const tasks = document.querySelectorAll('.task');
+    let tDone = 0, tActive = 0, tWaiting = 0;
+    tasks.forEach(t => {
+      if (t.classList.contains('status-done'))    tDone++;
+      else if (t.classList.contains('status-active')) tActive++;
+      else tWaiting++;
+    });
+    document.getElementById('cnt-done').textContent    = tDone;
+    document.getElementById('cnt-active').textContent  = tActive;
+    document.getElementById('cnt-waiting').textContent = tWaiting;
+  }
+
+  calcProgress();
+</script>
+</body>
+</html>
