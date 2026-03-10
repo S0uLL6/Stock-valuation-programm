@@ -25,7 +25,7 @@ import re
 import base64
 import requests
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 try:
     from bs4 import BeautifulSoup
     BS4_OK = True
@@ -309,6 +309,82 @@ def fetch_smartlab(ticker: str) -> dict:
 
     print(f"  ✅ Smart-lab: EPS={eps:.2f}₽  BVPS={bvps:.2f}₽  ROE={roe*100:.1f}%  g≈{g*100:.1f}%")
     return {"eps": eps, "bvps": bvps, "roe": roe, "g": g}
+
+# ────────────────────────────────────────────────────────────────
+#  Авто-получение ставок из открытых источников
+# ────────────────────────────────────────────────────────────────
+
+def fetch_cbr_key_rate() -> tuple:
+    """
+    Актуальная ключевая ставка ЦБ РФ через официальный XML-API cbr.ru.
+    Возвращает (дата_строкой, ставка_в_долях), например ('2025-02-14', 0.21).
+    При ошибке возвращает (None, None).
+    """
+    import xml.etree.ElementTree as ET
+    url = "https://www.cbr.ru/scripts/XML_keyrate.asp"
+    try:
+        r = requests.get(url, timeout=10,
+                         headers={"User-Agent": "StockValuator/1.0"})
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+        rates = []
+        for kr in root.findall("KR"):
+            date_s = kr.get("Date", "")
+            rate_s = kr.get("Rate", "0").replace(",", ".")
+            try:
+                rates.append((date_s, float(rate_s) / 100))
+            except ValueError:
+                pass
+        if rates:
+            rates.sort(key=lambda x: x[0])
+            return rates[-1]   # самая свежая запись
+    except Exception as e:
+        print(f"  ⚠ Ошибка загрузки ставки ЦБ РФ: {e}")
+    return (None, None)
+
+
+def fetch_moex_market_return(years: int = 5) -> tuple:
+    """
+    Историческая доходность российского рынка акций.
+    Использует MCFTR (индекс полной доходности MOEX — с учётом дивидендов).
+    Fallback: IMOEX (ценовой индекс).
+    Возвращает (cagr_float, описание) или (None, None) при ошибке.
+    """
+    till  = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=years * 365 + 60)).strftime("%Y-%m-%d")
+
+    for ticker in ("MCFTR", "IMOEX"):
+        url = (f"https://iss.moex.com/iss/engines/stock/markets/index/"
+               f"boards/SNDX/securities/{ticker}/candles.json"
+               f"?from={start}&till={till}&interval=24"
+               f"&iss.meta=off&iss.json=extended")
+        try:
+            r = requests.get(url, timeout=15,
+                             headers={"User-Agent": "StockValuator/1.0"})
+            r.raise_for_status()
+            closes, dates = [], []
+            for block in r.json():
+                if not isinstance(block, dict):
+                    continue
+                for row in block.get("candles", []):
+                    try:
+                        closes.append(float(row["close"]))
+                        dates.append(row["begin"][:10])
+                    except Exception:
+                        pass
+            if len(closes) >= 50:
+                actual_years = (datetime.strptime(dates[-1], "%Y-%m-%d") -
+                                datetime.strptime(dates[0],  "%Y-%m-%d")).days / 365.25
+                cagr = (closes[-1] / closes[0]) ** (1 / actual_years) - 1
+                desc = (f"{ticker}  {dates[0]}→{dates[-1]}  "
+                        f"{closes[0]:.0f}→{closes[-1]:.0f}  "
+                        f"CAGR {cagr*100:.1f}%")
+                return (round(cagr, 4), desc)
+        except Exception as e:
+            print(f"  ⚠ {ticker}: {e}")
+
+    return (None, None)
+
 
 # ────────────────────────────────────────────────────────────────
 #  MOEX ISS API
