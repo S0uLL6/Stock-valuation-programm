@@ -575,7 +575,17 @@ class ValuationPage(ctk.CTkFrame):
         ms = interval_map.get(self._interval_var.get(), 300_000)
         self._auto_job = self.after(ms, self._do_auto_update)
 
+    def _flash_price(self, color, n=4):
+        """Мигание border карточки справедливой цены при обновлении."""
+        if n <= 0:
+            return
+        current = self.fair_card.cget("border_color")
+        next_color = color if current != color else BORDER
+        self.fair_card.configure(border_color=next_color)
+        self.after(180, lambda: self._flash_price(color, n - 1))
+
     def _apply_auto_price(self, ticker, price):
+        prev_price = self._loaded_price
         self._loaded_price = price
         ts = datetime.now().strftime("%H:%M:%S")
         # Пересчитываем upside если есть данные расчёта
@@ -592,6 +602,9 @@ class ValuationPage(ctk.CTkFrame):
                 self.upside_lbl.configure(
                     text=f"▼ {upside:.1f}% переоценена", text_color=RED)
                 self.fair_card.configure(border_color=RED)
+        if prev_price and abs(price - prev_price) > 0.001:
+            flash_color = GREEN if price >= prev_price else RED
+            self._flash_price(flash_color)
         self._status(f"⟳ Обновлено: {ts}  Цена: {price:.2f} ₽", MUTED)
 
     def _pick_pdf(self):
