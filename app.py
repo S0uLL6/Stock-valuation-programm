@@ -1389,8 +1389,39 @@ class AnalyticsPage(ctk.CTkFrame):
             self.price_canvas.draw()
             return
 
-        # Линия всегда зелёная
-        ax.plot(dates, closes, color=GREEN, linewidth=1.8)
+        # ── Сравнение тикеров ──────────────────────────────────
+        has_cmp = bool(self._cmp_dates and self._cmp_closes and self._cmp_ticker)
+        if has_cmp:
+            # Пересечение дат
+            cmp_map = dict(zip(self._cmp_dates, self._cmp_closes))
+            common_dates = sorted(d for d in dates if d in cmp_map)
+            if common_dates:
+                base_date = common_dates[0]
+                idx0_main = dates.index(base_date)
+                base_main = closes[idx0_main]
+                base_cmp  = cmp_map[base_date]
+                if self._norm_mode and base_main and base_cmp:
+                    plot_main = [closes[dates.index(d)] / base_main * 100
+                                 for d in common_dates]
+                    plot_cmp  = [cmp_map[d] / base_cmp * 100
+                                 for d in common_dates]
+                    ax.set_ylabel("Норм. цена, %", color=MUTED, fontsize=10)
+                else:
+                    plot_main = [closes[dates.index(d)] for d in common_dates]
+                    plot_cmp  = [cmp_map[d] for d in common_dates]
+                ax.plot(common_dates, plot_main, color=GREEN,  linewidth=1.8,
+                        label=self.current_ticker)
+                ax.plot(common_dates, plot_cmp,  color="#79C0FF", linewidth=1.6,
+                        label=self._cmp_ticker, alpha=0.9)
+                ax.legend(fontsize=9, loc="upper left",
+                          facecolor=CARD, edgecolor=BORDER, labelcolor=TEXT)
+                dates  = common_dates
+                closes = plot_main
+            else:
+                has_cmp = False
+
+        if not has_cmp:
+            ax.plot(dates, closes, color=GREEN, linewidth=1.8)
         self._price_span_patch = None
 
         # min / max маркеры
