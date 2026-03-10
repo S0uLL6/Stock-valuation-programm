@@ -54,6 +54,29 @@ def _save_config():
 
 _load_config()
 
+# ── Портфель (персистентность) ──────────────────────────────────
+_PORTFOLIO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portfolio_state.json")
+
+def _save_portfolio(portfolio: dict):
+    try:
+        serializable = {}
+        for ticker, d in portfolio.items():
+            serializable[ticker] = {k: v for k, v in d.items()
+                                    if isinstance(v, (str, int, float, bool, type(None)))}
+        with open(_PORTFOLIO_PATH, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠ Ошибка сохранения портфеля: {e}")
+
+def _load_portfolio() -> dict:
+    if os.path.exists(_PORTFOLIO_PATH):
+        try:
+            with open(_PORTFOLIO_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
 # ── Цвета ──────────────────────────────────────────────────────
 BG      = "#0D1117"
 CARD    = "#161B22"
@@ -410,11 +433,13 @@ class ValuationPage(ctk.CTkFrame):
         try:
             val = float(entry_widget.get().replace("%","").strip())
             self.portfolio[ticker]["weight"] = val
+            _save_portfolio(self.portfolio)
         except ValueError:
             pass
 
     def _remove(self, ticker):
         self.portfolio.pop(ticker, None)
+        _save_portfolio(self.portfolio)
         self._refresh_table()
 
     # ── Spinner ────────────────────────────────────────────────
@@ -606,6 +631,7 @@ class ValuationPage(ctk.CTkFrame):
             w = None
         self.data["weight"] = w
         self.portfolio[self.data["ticker"]] = dict(self.data)
+        _save_portfolio(self.portfolio)
         self._refresh_table()
         self._status(f"✓ {self.data['ticker']} добавлен в портфель", GREEN)
 
