@@ -779,8 +779,201 @@
   </div>
 </div>
 
+
+<!-- ───────────────── БЛОК: Улучшение расчётов ───────────────── -->
+<div class="section-label">🔧 Улучшение расчётов</div>
+
+<!-- 15 -->
+<div class="task status-done" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">15</div>
+    <div class="task-title">Исправление DCF модели</div>
+    <span class="task-status-badge">Завершено</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">15.1 — FCF = EPS × payout_ratio (d0/eps, не более 1.0), дефолт 50% при отсутствии дивиденда</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">15.2 — Минимальный спред k − g_term ≥ 5% (принудительное снижение g_term, защита от взрыва TV)</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">15.3 — g_proj = min(g, 20%) — ограничение прогнозного роста в прогнозном периоде</div>
+      <span class="sub-tag">Done</span>
+    </div>
+  </div>
+</div>
+
+<!-- 16 -->
+<div class="task status-done" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">16</div>
+    <div class="task-title">Авто-загрузка актуальных отраслевых P/E</div>
+    <span class="task-status-badge">Завершено</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">16.1 — SECTOR_REPS: 2 репрезентативных тикера на каждый из 10 секторов</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">16.2 — fetch_sector_pe_live(): параллельный запрос цены MOEX + EPS SmartLab, медианный P/E</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">16.3 — _LIVE_SECTOR_PE: модульный dict, get_sector_pe() берёт живые данные в первую очередь</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">16.4 — Фоновый поток при старте App автоматически запускает загрузку</div>
+      <span class="sub-tag">Done</span>
+    </div>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">16.5 — Страница Настройки: таблица «Базовый / Актуальный P/E» + кнопка «Обновить P/E секторов»</div>
+      <span class="sub-tag">Done</span>
+    </div>
+  </div>
+</div>
+
+<!-- 17 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">17</div>
+    <div class="task-title">Ограничение g в моделях DDM и RIV</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">17.1 — DDM: g_ddm = min(g, 0.20) — ограничить входной рост до 20%</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">17.2 — RIV: ri пересчитать с g_riv = min(g, 0.20) для ROE-прогноза</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">17.3 — Предупреждение в статус-строке если g > 20% (пользователь ввёл аномальное значение)</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+  </div>
+</div>
+
+<!-- 18 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">18</div>
+    <div class="task-title">Взвешенная агрегация справедливой цены</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-high">
+      <div class="sub-check">○</div>
+      <div class="sub-text">18.1 — Весовая схема: P/E 30%, DCF 25%, RIV 25%, DDM 20% (только при наличии данных, нормировать)</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">18.2 — DDM исключается (вес=0) если d0=0, остальные перенормируются</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">18.3 — Отображение весов в UI (мелкий текст под «Справедливая цена»)</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+  </div>
+</div>
+
+<!-- 19 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">19</div>
+    <div class="task-title">RIV с терминальной стоимостью</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">19.1 — TV = RI_T / k (перпетуитет остаточного дохода после T лет), pv_tv = TV / (1+k)^T</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">19.2 — riv_price() = BVPS + Σ pv_ri + pv_tv (защита: TV=0 если ri ≤ 0)</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+  </div>
+</div>
+
+<!-- 20 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">20</div>
+    <div class="task-title">История оценок — сохранение и сравнение</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">20.1 — При нажатии «Рассчитать» сохранять {тикер, дата, цена, DDM, PE, RIV, DCF, avg} в history.json</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-medium">
+      <div class="sub-check">○</div>
+      <div class="sub-text">20.2 — Кнопка «История» в левой панели — popup-список предыдущих расчётов по тикеру</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">20.3 — Мини-график в popup: динамика справедливой цены vs рыночной цены по датам</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+  </div>
+</div>
+
+<!-- 21 -->
+<div class="task status-waiting" onclick="toggle(this)">
+  <div class="task-header">
+    <div class="task-num">21</div>
+    <div class="task-title">Кеш отраслевых P/E в config.json (TTL 24ч)</div>
+    <span class="task-status-badge">Ожидает</span>
+    <span class="task-arrow">▼</span>
+  </div>
+  <div class="subtasks">
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">21.1 — Сохранять {sector_pe: {...}, sector_pe_ts: timestamp} в config.json</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+    <div class="subtask sub-waiting priority-low">
+      <div class="sub-check">○</div>
+      <div class="sub-text">21.2 — При старте: если кеш моложе 24ч — загружать из файла, иначе запускать fetch</div>
+      <span class="sub-tag">Waiting</span>
+    </div>
+  </div>
+</div>
+
 <div class="footer">
-  Stock Valuation App — Roadmap v1.0 &nbsp;·&nbsp; обновляется по мере работы
+  Stock Valuation App — Roadmap v1.1 &nbsp;·&nbsp; обновляется по мере работы
 </div>
 
 <script>
