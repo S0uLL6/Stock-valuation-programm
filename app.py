@@ -1357,6 +1357,16 @@ class App(ctk.CTk):
             b.pack(side="left", padx=3)
             self.nav_btns[key] = b
 
+        # Индикатор ставок справа в nav
+        rates_frame = ctk.CTkFrame(nav, fg_color=CARD2,
+                                   corner_radius=8)
+        rates_frame.pack(side="right", padx=16, pady=8)
+        self._rates_lbl = lbl(
+            rates_frame,
+            f"r_f {CONFIG['r_f']*100:.1f}%   r_m {CONFIG['r_m']*100:.1f}%",
+            size=12, color=MUTED)
+        self._rates_lbl.pack(padx=12, pady=4)
+
     def _build_pages(self):
         c = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         c.pack(fill="both", expand=True)
@@ -1378,7 +1388,8 @@ class App(ctk.CTk):
                         text_color=TEXT  if k==key else MUTED)
 
     def _refresh_rates_label(self):
-        pass  # будет реализовано в 1.5
+        self._rates_lbl.configure(
+            text=f"r_f {CONFIG['r_f']*100:.1f}%   r_m {CONFIG['r_m']*100:.1f}%")
 
 
 if __name__ == "__main__":
