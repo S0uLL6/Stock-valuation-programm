@@ -1112,8 +1112,14 @@ class AnalyticsPage(ctk.CTkFrame):
             fg_color=CARD2, hover_color=RED,
             font=ctk.CTkFont(size=11),
             command=self._clear_compare)
-        self._cmp_clear_btn.pack(side="left", padx=(0, 8))
+        self._cmp_clear_btn.pack(side="left", padx=(0, 4))
         self._cmp_clear_btn.configure(state="disabled")
+        self._norm_var = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            price_hdr, text="Норм", variable=self._norm_var,
+            font=ctk.CTkFont(size=11), text_color=MUTED,
+            fg_color=ACCENT, hover_color=BORDER,
+            command=self._on_norm_toggle).pack(side="left", padx=(0, 12))
 
         # Чекбоксы индикаторов
         saved_ind = CONFIG.get("indicators", {})
@@ -1358,6 +1364,11 @@ class AnalyticsPage(ctk.CTkFrame):
         self._cmp_entry.delete(0, "end")
         self._cmp_clear_btn.configure(state="disabled")
         self._apply_period(self._active_period)
+
+    def _on_norm_toggle(self):
+        self._norm_mode = self._norm_var.get()
+        if self._cmp_ticker:
+            self._apply_period(self._active_period)
 
     def _on_volume_toggle(self):
         self.vol_ax.set_visible(self._show_volume.get())
