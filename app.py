@@ -336,10 +336,14 @@ class ValuationPage(ctk.CTkFrame):
 
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
-            row=23, padx=16, pady=(8,4), sticky="ew")
+            row=23, padx=16, pady=(8,2), sticky="ew")
+
+        btn(p, "Экспорт CSV", self._export_csv,
+            color=CARD2, width=200).grid(
+            row=24, padx=16, pady=(2,4), sticky="ew")
 
         self.status_lbl = lbl(p, "", size=11, color=MUTED)
-        self.status_lbl.grid(row=24, padx=16, pady=(4,12), sticky="w")
+        self.status_lbl.grid(row=25, padx=16, pady=(4,12), sticky="w")
 
     # ── Карточки результатов ───────────────────────────────────
     def _build_results(self):
