@@ -2096,8 +2096,8 @@ class SettingsPage(ctk.CTkFrame):
         hdr_f = ctk.CTkFrame(pe_card, fg_color="transparent")
         hdr_f.pack(fill="x", padx=20, pady=(14, 4))
         for txt, w in [("Сектор", 180), ("Базовый", 80), ("Актуальный", 100)]:
-            lbl(hdr_f, txt, size=11, color=MUTED, weight="bold").pack(
-                side="left", anchor="w", width=w)
+            lbl(hdr_f, txt, size=11, color=MUTED, weight="bold", width=w).pack(
+                side="left", anchor="w")
 
         Div(pe_card).pack(fill="x", padx=20, pady=2)
 
@@ -2110,10 +2110,10 @@ class SettingsPage(ctk.CTkFrame):
         for sector in sectors_order:
             row_f = ctk.CTkFrame(pe_card, fg_color="transparent")
             row_f.pack(fill="x", padx=20, pady=2)
-            lbl(row_f, sector, size=12).pack(side="left", anchor="w", width=180)
+            lbl(row_f, sector, size=12, width=180).pack(side="left", anchor="w")
             base_val = SECTOR_PE.get(sector, SECTOR_PE["default"])
-            base_l = lbl(row_f, f"{base_val:.1f}x", size=12, color=MUTED)
-            base_l.pack(side="left", anchor="w", width=80)
+            base_l = lbl(row_f, f"{base_val:.1f}x", size=12, color=MUTED, width=80)
+            base_l.pack(side="left", anchor="w")
             live_l = lbl(row_f, "—", size=12, color=MUTED)
             live_l.pack(side="left", anchor="w")
             self._pe_rows[sector] = (base_l, live_l)
