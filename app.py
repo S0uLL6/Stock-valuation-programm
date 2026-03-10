@@ -1296,6 +1296,8 @@ class SettingsPage(ctk.CTkFrame):
 
         btn(row_btn, "Применить", self._apply,
             color="#238636", width=160, height=38).pack(side="left")
+        btn(row_btn, "Сбросить к умолчаниям", self._reset,
+            color=CARD2, width=200, height=38).pack(side="left", padx=(10, 0))
         self._status_lbl = lbl(row_btn, "", size=12, color=MUTED)
         self._status_lbl.pack(side="left", padx=(16, 0))
 
@@ -1317,6 +1319,18 @@ class SettingsPage(ctk.CTkFrame):
         self._status_lbl.configure(
             text=f"✓ Сохранено: r_f={r_f*100:.2f}%  r_m={r_m*100:.2f}%",
             text_color=GREEN)
+        self.app._refresh_rates_label()
+
+    def _reset(self):
+        CONFIG.update(_CONFIG_DEFAULTS)
+        _save_config()
+        for key, e in self._entries.items():
+            e.delete(0, "end")
+            e.insert(0, str(_CONFIG_DEFAULTS[key]))
+        self._status_lbl.configure(
+            text=f"↩ Сброшено: r_f={_CONFIG_DEFAULTS['r_f']*100:.0f}%  "
+                 f"r_m={_CONFIG_DEFAULTS['r_m']*100:.0f}%",
+            text_color=MUTED)
         self.app._refresh_rates_label()
 
 
