@@ -385,6 +385,23 @@ class ValuationPage(ctk.CTkFrame):
 
             self.model_cards[key] = vl
 
+        # P/E мини-карточка (row=1, span all columns)
+        pe_card = Card(f)
+        pe_card.grid(row=1, column=0, columnspan=5, padx=4, pady=(6,0), sticky="ew")
+        pe_card.grid_columnconfigure((0,1,2,3), weight=1)
+        lbl(pe_card, "P/E текущий", size=11, color=MUTED).grid(
+            row=0, column=0, padx=14, pady=(8,2), sticky="w")
+        lbl(pe_card, "P/E отраслевой", size=11, color=MUTED).grid(
+            row=0, column=1, padx=14, pady=(8,2), sticky="w")
+        lbl(pe_card, "Оценка", size=11, color=MUTED).grid(
+            row=0, column=2, padx=14, pady=(8,2), sticky="w")
+        self._pe_cur_lbl    = lbl(pe_card, "—", size=18, weight="bold")
+        self._pe_cur_lbl.grid(row=1, column=0, padx=14, pady=(0,8), sticky="w")
+        self._pe_sec_lbl    = lbl(pe_card, "—", size=18, weight="bold", color=MUTED)
+        self._pe_sec_lbl.grid(row=1, column=1, padx=14, pady=(0,8), sticky="w")
+        self._pe_verdict_lbl = lbl(pe_card, "—", size=13, color=MUTED)
+        self._pe_verdict_lbl.grid(row=1, column=2, padx=14, pady=(0,8), sticky="w")
+
         # Итог
         self.fair_card = Card(f)
         self.fair_card.grid(row=0, column=4, padx=(8,0), sticky="nsew")
@@ -770,6 +787,9 @@ class ValuationPage(ctk.CTkFrame):
         self.upside_lbl.configure(text="", text_color=MUTED)
         self.models_used.configure(text="")
         self.fair_card.configure(border_color=BORDER)
+        self._pe_cur_lbl.configure(text="—", text_color=TEXT)
+        self._pe_sec_lbl.configure(text="—", text_color=MUTED)
+        self._pe_verdict_lbl.configure(text="—", text_color=MUTED)
         # 13.4 — Сброс PDF
         self.pdf_path = None
         self.pdf_lbl.configure(text="PDF: не выбран", text_color=MUTED)
@@ -779,6 +799,27 @@ class ValuationPage(ctk.CTkFrame):
         self._loaded_name  = ""
         self.data = None
         self._status("Поля сброшены", MUTED)
+
+    def _update_pe_card(self, cur_pe, sector_pe):
+        if cur_pe > 0:
+            self._pe_cur_lbl.configure(text=f"{cur_pe:.1f}")
+        else:
+            self._pe_cur_lbl.configure(text="—", text_color=MUTED)
+            self._pe_sec_lbl.configure(text="—")
+            self._pe_verdict_lbl.configure(text="нет EPS", text_color=MUTED)
+            return
+        self._pe_sec_lbl.configure(text=f"{sector_pe:.1f}", text_color=MUTED)
+        if cur_pe < sector_pe:
+            color   = GREEN
+            verdict = f"▼ ниже отрасли на {sector_pe - cur_pe:.1f}x"
+        elif cur_pe > sector_pe:
+            color   = RED
+            verdict = f"▲ выше отрасли на {cur_pe - sector_pe:.1f}x"
+        else:
+            color   = MUTED
+            verdict = "= на уровне отрасли"
+        self._pe_cur_lbl.configure(text_color=color)
+        self._pe_verdict_lbl.configure(text=verdict, text_color=color)
 
     def _calculate(self):
         ticker = self.ticker_e.get().strip().upper().replace(".ME","")
