@@ -221,24 +221,28 @@ def _sfloat(s: str) -> float:
         return 0.0
 
 
-def fetch_smartlab(ticker: str) -> dict:
+def fetch_smartlab(ticker: str, verbose: bool = True) -> dict:
     """
     Парсит smart-lab.ru/q/TICKER/f/y/ — годовая МСФО отчётность.
     Возвращает dict с ключами: eps, bvps, roe, g  (или пустой dict при ошибке).
+    verbose=False — без вывода в консоль (для фоновых запросов).
     """
     if not BS4_OK:
-        print("  ⚠ beautifulsoup4 не установлен: pip install beautifulsoup4")
+        if verbose:
+            print("  ⚠ beautifulsoup4 не установлен: pip install beautifulsoup4")
         return {}
 
     ticker_clean = ticker.upper().replace(".ME", "")
     url = f"https://smart-lab.ru/q/{ticker_clean}/f/y/"
-    print(f"  📊 Загружаю фундаментальные данные с smart-lab.ru…")
+    if verbose:
+        print(f"  📊 Загружаю фундаментальные данные с smart-lab.ru…")
 
     try:
         r = requests.get(url, headers=SMARTLAB_HDR, timeout=20)
         r.raise_for_status()
     except Exception as e:
-        print(f"  ⚠ smart-lab недоступен: {e}")
+        if verbose:
+            print(f"  ⚠ smart-lab недоступен: {e}")
         return {}
 
     soup = BeautifulSoup(r.text, "html.parser")
@@ -252,7 +256,8 @@ def fetch_smartlab(ticker: str) -> dict:
             break
 
     if not table:
-        print("  ⚠ Таблица с данными не найдена на smart-lab")
+        if verbose:
+            print("  ⚠ Таблица с данными не найдена на smart-lab")
         return {}
 
     # Собираем строки: {название_строки: [значение_по_годам]}
@@ -304,10 +309,12 @@ def fetch_smartlab(ticker: str) -> dict:
             pass
 
     if eps == 0 and bvps == 0:
-        print("  ⚠ Данные с smart-lab не распознаны (возможно сайт изменил структуру)")
+        if verbose:
+            print("  ⚠ Данные с smart-lab не распознаны (возможно сайт изменил структуру)")
         return {}
 
-    print(f"  ✅ Smart-lab: EPS={eps:.2f}₽  BVPS={bvps:.2f}₽  ROE={roe*100:.1f}%  g≈{g*100:.1f}%")
+    if verbose:
+        print(f"  ✅ Smart-lab: EPS={eps:.2f}₽  BVPS={bvps:.2f}₽  ROE={roe*100:.1f}%  g≈{g*100:.1f}%")
     return {"eps": eps, "bvps": bvps, "roe": roe, "g": g}
 
 # ────────────────────────────────────────────────────────────────
@@ -652,7 +659,7 @@ def fetch_yfinance(ticker: str, pdf_path: str = None) -> dict:
 #  Модели оценки
 # ────────────────────────────────────────────────────────────────
 
-# Отраслевые P/E для российского рынка (медианные значения)
+# Отраслевые P/E для российского рынка — базовые значения (fallback)
 SECTOR_PE = {
     "Нефть и газ":       5.5,
     "Банки":             5.0,
@@ -683,10 +690,81 @@ TICKER_SECTOR = {
     "SMLT": "Девелопмент", "PIKK": "Девелопмент",
 }
 
+# Репрезентативные тикеры на сектор для расчёта реального P/E
+SECTOR_REPS = {
+    "Банки":             ["SBER", "VTBR"],
+    "Нефть и газ":       ["LKOH", "TATN"],
+    "Металлы":           ["GMKN", "NLMK"],
+    "Ритейл":            ["MGNT", "FIVE"],
+    "Телеком":           ["MTSS", "RTKM"],
+    "Технологии":        ["YNDX", "OZON"],
+    "Электроэнергетика": ["FEES", "HYDR"],
+    "Удобрения":         ["PHOR", "AKRN"],
+    "Транспорт":         ["FLOT", "AFLT"],
+    "Девелопмент":       ["SMLT"],
+}
+
+# Живые P/E: обновляются из фонового потока (app.py → _refresh_sector_pe)
+_LIVE_SECTOR_PE: dict = {}
+
 
 def get_sector_pe(ticker: str) -> float:
+    """Возвращает отраслевой P/E: сначала из живых данных, иначе базовый fallback."""
     sector = TICKER_SECTOR.get(ticker.upper(), "default")
+    live   = _LIVE_SECTOR_PE.get(sector)
+    if live and live > 0:
+        return live
     return SECTOR_PE.get(sector, SECTOR_PE["default"])
+
+
+def fetch_sector_pe_live() -> dict:
+    """
+    Для каждого сектора берём репрезентативные тикеры,
+    параллельно запрашиваем цену (MOEX) + EPS (SmartLab),
+    вычисляем медианный P/E.
+    Возвращает dict {sector: float}.  Тихий режим — без вывода в консоль.
+    """
+    import statistics
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _ticker_pe(ticker: str):
+        try:
+            price = moex_price(ticker)
+            if price <= 0:
+                return None
+            sl = fetch_smartlab(ticker, verbose=False)
+            eps = sl.get("eps", 0.0) if sl else 0.0
+            if eps <= 0:
+                return None
+            pe = price / eps
+            return pe if 1.0 < pe < 150.0 else None   # sanity
+        except Exception:
+            return None
+
+    result = {}
+    # Все тикеры разом — максимум параллельности
+    all_tickers = [(sector, t) for sector, tickers in SECTOR_REPS.items()
+                               for t in tickers]
+    pe_by_sector: dict = {s: [] for s in SECTOR_REPS}
+
+    with ThreadPoolExecutor(max_workers=min(len(all_tickers), 10)) as ex:
+        futures = {ex.submit(_ticker_pe, t): (sector, t)
+                   for sector, t in all_tickers}
+        for f in as_completed(futures):
+            sector, _ = futures[f]
+            pe = f.result()
+            if pe is not None:
+                pe_by_sector[sector].append(pe)
+
+    for sector, pes in pe_by_sector.items():
+        if pes:
+            result[sector] = round(statistics.median(pes), 1)
+        else:
+            result[sector] = SECTOR_PE.get(sector, SECTOR_PE["default"])
+
+    all_vals = list(result.values())
+    result["default"] = round(statistics.median(all_vals), 1) if all_vals else SECTOR_PE["default"]
+    return result
 
 
 def ddm_price(d: dict) -> float:
