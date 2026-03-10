@@ -932,11 +932,13 @@ class AnalyticsPage(ctk.CTkFrame):
         self.current_ticker = ticker
         self.title_lbl.configure(text=f"Аналитика — {ticker}")
         self._all_dates = []; self._all_closes = []
+        self._all_opens = []; self._all_volumes = []
         threading.Thread(target=self._fetch, args=(ticker,), daemon=True).start()
 
     def _fetch_candles_all(self, ticker):
-        """Грузим всю историю дневных свечей с пагинацией MOEX ISS."""
-        dates, closes = [], []
+        """Грузим всю историю дневных свечей с пагинацией MOEX ISS.
+        Возвращает (dates, closes, opens, volumes)."""
+        dates, closes, opens, volumes = [], [], [], []
         start = "2015-01-01"
         till  = datetime.now().strftime("%Y-%m-%d")
         while True:
@@ -947,7 +949,7 @@ class AnalyticsPage(ctk.CTkFrame):
             r = requests.get(url, timeout=20,
                              headers={"User-Agent": "StockValuator/1.0"})
             r.raise_for_status()
-            batch_dates, batch_closes = [], []
+            batch_dates, batch_closes, batch_opens, batch_volumes = [], [], [], []
             for block in r.json():
                 if not isinstance(block, dict): continue
                 for row in block.get("candles", []):
@@ -955,29 +957,32 @@ class AnalyticsPage(ctk.CTkFrame):
                         dt = datetime.strptime(row["begin"][:10], "%Y-%m-%d")
                         batch_dates.append(dt)
                         batch_closes.append(float(row["close"]))
+                        batch_opens.append(float(row.get("open", row["close"])))
+                        batch_volumes.append(float(row.get("volume", 0)))
                     except Exception:
                         continue
             if not batch_dates:
                 break
-            dates.extend(batch_dates)
-            closes.extend(batch_closes)
-            # MOEX отдаёт max 500 свечей за раз; если меньше — конец
+            dates.extend(batch_dates); closes.extend(batch_closes)
+            opens.extend(batch_opens); volumes.extend(batch_volumes)
             if len(batch_dates) < 500:
                 break
-        return dates, closes
+        return dates, closes, opens, volumes
 
     def _fetch(self, ticker):
         # ── 1. Цена (все дневные свечи) ────────────────────────
         try:
-            dates, closes = self._fetch_candles_all(ticker)
+            dates, closes, opens, volumes = self._fetch_candles_all(ticker)
             # Фильтруем: берём только данные за последние 10 лет
             cutoff10 = datetime.now() - timedelta(days=3650)
-            pairs = [(d,c) for d,c in zip(dates,closes) if d >= cutoff10]
-            if pairs:
-                dates, closes = zip(*pairs)
-                dates, closes = list(dates), list(closes)
-            self._all_dates  = dates
-            self._all_closes = closes
+            quads = [(d, c, o, v) for d, c, o, v
+                     in zip(dates, closes, opens, volumes) if d >= cutoff10]
+            if quads:
+                dates, closes, opens, volumes = map(list, zip(*quads))
+            self._all_dates   = dates
+            self._all_closes  = closes
+            self._all_opens   = opens
+            self._all_volumes = volumes
             self.after(0, lambda: self._apply_period(self._active_period))
         except Exception as e:
             self._all_dates  = []
