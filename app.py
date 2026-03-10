@@ -1363,6 +1363,7 @@ class AnalyticsPage(ctk.CTkFrame):
         self._cmp_closes  = []
         self._cmp_entry.delete(0, "end")
         self._cmp_clear_btn.configure(state="disabled")
+        self.price_ax.set_ylabel("Цена, ₽", color=MUTED, fontsize=10)
         self._apply_period(self._active_period)
 
     def _on_norm_toggle(self):
