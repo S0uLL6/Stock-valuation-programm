@@ -206,6 +206,8 @@ class ValuationPage(ctk.CTkFrame):
         self._tooltip_win  = None
         self._spinner_angle = 0
         self._spinning = False
+        self._auto_on   = False
+        self._auto_job  = None
         self._build()
         if self.portfolio:
             self.after(200, self._refresh_table)
@@ -262,14 +264,33 @@ class ValuationPage(ctk.CTkFrame):
                                      bg=CARD, highlightthickness=0)
         self.spin_canvas.grid(row=2, padx=16, pady=(6,0), sticky="w")
 
-        self.pdf_lbl = lbl(p, "PDF: не выбран", size=10, color=MUTED)
-        self.pdf_lbl.grid(row=3, padx=16, pady=(4,0), sticky="w")
-        btn(p, "Прикрепить PDF", self._pick_pdf,
-            color=CARD2, width=200).grid(row=4, padx=16, pady=(4,0), sticky="w")
+        # Авто-обновление цены
+        auto_row = ctk.CTkFrame(p, fg_color="transparent")
+        auto_row.grid(row=3, padx=16, pady=(4, 0), sticky="w")
+        self._auto_btn = ctk.CTkButton(
+            auto_row, text="⟳ Авто: выкл", width=110, height=26,
+            fg_color=CARD2, hover_color=BORDER,
+            font=ctk.CTkFont(size=11), command=self._toggle_auto)
+        self._auto_btn.pack(side="left", padx=(0, 6))
+        self._interval_var = tk.StringVar(value="5м")
+        ctk.CTkOptionMenu(
+            auto_row, values=["1м", "5м", "10м"],
+            variable=self._interval_var,
+            width=60, height=26,
+            fg_color=CARD2, button_color=CARD2,
+            button_hover_color=BORDER,
+            font=ctk.CTkFont(size=11),
+            dropdown_fg_color=CARD,
+        ).pack(side="left")
 
-        Div(p).grid(row=5, padx=16, pady=10, sticky="ew")
+        self.pdf_lbl = lbl(p, "PDF: не выбран", size=10, color=MUTED)
+        self.pdf_lbl.grid(row=4, padx=16, pady=(4,0), sticky="w")
+        btn(p, "Прикрепить PDF", self._pick_pdf,
+            color=CARD2, width=200).grid(row=5, padx=16, pady=(4,0), sticky="w")
+
+        Div(p).grid(row=6, padx=16, pady=10, sticky="ew")
         lbl(p, "Фундаментальные данные", size=11, color=MUTED).grid(
-            row=6, padx=16, pady=(0,8), sticky="w")
+            row=7, padx=16, pady=(0,8), sticky="w")
 
         self.fields = {}
         for i, (key, lb, ph) in enumerate([
@@ -279,22 +300,22 @@ class ValuationPage(ctk.CTkFrame):
             ("g",    "g (0.08 = 8%)",    "Рост дивидендов"),
             ("beta", "β (бета)",          "Бета акции"),
         ]):
-            r = 7 + i * 2
+            r = 8 + i * 2
             lbl(p, lb, size=11, color=MUTED).grid(
                 row=r, padx=16, pady=(4,0), sticky="w")
             e = inp(p, ph=ph)
             e.grid(row=r+1, padx=16, pady=(2,0), sticky="ew")
             self.fields[key] = e
 
-        Div(p).grid(row=17, padx=16, pady=10, sticky="ew")
+        Div(p).grid(row=18, padx=16, pady=10, sticky="ew")
 
         self.calc_btn = btn(p, "Рассчитать", self._calculate,
                             color="#238636", width=200, height=40)
-        self.calc_btn.grid(row=18, padx=16, pady=(0,4), sticky="ew")
+        self.calc_btn.grid(row=19, padx=16, pady=(0,4), sticky="ew")
 
         # Блок добавления в портфель
         add_frame = ctk.CTkFrame(p, fg_color=CARD2, corner_radius=8)
-        add_frame.grid(row=19, padx=16, pady=(4,0), sticky="ew")
+        add_frame.grid(row=20, padx=16, pady=(4,0), sticky="ew")
         add_frame.grid_columnconfigure(0, weight=1)
 
         lbl(add_frame, "Доля в портфеле, %", size=11,
@@ -307,18 +328,18 @@ class ValuationPage(ctk.CTkFrame):
 
         btn(p, "Анализ чувствительности", self._show_sensitivity,
             color=CARD2, width=200).grid(
-            row=19, padx=16, pady=(4,0), sticky="ew")
+            row=21, padx=16, pady=(4,0), sticky="ew")
 
         btn(p, "Сценарный анализ", self._show_scenarios,
             color=CARD2, width=200).grid(
-            row=20, padx=16, pady=(4,0), sticky="ew")
+            row=22, padx=16, pady=(4,0), sticky="ew")
 
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
-            row=21, padx=16, pady=(8,4), sticky="ew")
+            row=23, padx=16, pady=(8,4), sticky="ew")
 
         self.status_lbl = lbl(p, "", size=11, color=MUTED)
-        self.status_lbl.grid(row=22, padx=16, pady=(4,12), sticky="w")
+        self.status_lbl.grid(row=24, padx=16, pady=(4,12), sticky="w")
 
     # ── Карточки результатов ───────────────────────────────────
     def _build_results(self):
