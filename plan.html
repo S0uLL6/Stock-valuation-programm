@@ -434,38 +434,38 @@
 </div>
 
 <!-- 5 -->
-<div class="task status-waiting" onclick="toggle(this)">
+<div class="task status-done" onclick="toggle(this)">
   <div class="task-header">
     <div class="task-num">5</div>
     <div class="task-title">SMA / EMA на графике цены</div>
-    <span class="task-status-badge">Ожидает</span>
+    <span class="task-status-badge">Завершено</span>
     <span class="task-arrow">▼</span>
   </div>
   <div class="subtasks">
-    <div class="subtask sub-waiting priority-medium">
-      <div class="sub-check">○</div>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
       <div class="sub-text">5.1 — Панель переключателей: SMA 20, SMA 50, SMA 200, EMA 20</div>
-      <span class="sub-tag">Ожидает</span>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-high">
-      <div class="sub-check">○</div>
-      <div class="sub-text">5.2 — Расчёт скользящих средних из _all_closes (numpy/pandas)</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">5.2 — Расчёт скользящих средних из closes (чистый Python, без numpy)</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-high">
-      <div class="sub-check">○</div>
-      <div class="sub-text">5.3 — Отрисовка поверх ценового графика с цветовым кодированием</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">5.3 — Отрисовка поверх ценового графика с цветовым кодированием + легенда</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-medium">
-      <div class="sub-check">○</div>
-      <div class="sub-text">5.4 — Добавить значение SMA в hover-тултип</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">5.4 — Значения SMA/EMA в hover-тултипе (SMA20: X.XX  SMA50: Y.YY)</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">5.5 — Сохранять выбранные индикаторы между сессиями (в config.json)</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">5.5 — Сохранение выбранных индикаторов между сессиями в config.json</div>
+      <span class="sub-tag">Done</span>
     </div>
   </div>
 </div>
@@ -474,38 +474,33 @@
 <div class="section-label">🟡 Средний приоритет</div>
 
 <!-- 6 -->
-<div class="task status-waiting" onclick="toggle(this)">
+<div class="task status-done" onclick="toggle(this)">
   <div class="task-header">
     <div class="task-num">6</div>
     <div class="task-title">Сценарный анализ (bull / base / bear)</div>
-    <span class="task-status-badge">Ожидает</span>
+    <span class="task-status-badge">Завершено</span>
     <span class="task-arrow">▼</span>
   </div>
   <div class="subtasks">
-    <div class="subtask sub-waiting priority-medium">
-      <div class="sub-check">○</div>
-      <div class="sub-text">6.1 — UI: раскрывающаяся секция «Сценарии» под полями ввода</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">6.1 — Кнопка «Сценарный анализ» в левой панели</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-medium">
-      <div class="sub-check">○</div>
-      <div class="sub-text">6.2 — 3 набора параметров (g, ROE): автозаполнение ±30% от базового</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">6.2 — Popup с 3 колонками: 🐻 Медведь / — База / 🐂 Бык, пресеты ±50% g и ±15/20% k</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-high">
-      <div class="sub-check">○</div>
-      <div class="sub-text">6.3 — Расчёт справедливой цены для каждого сценария по всем 4 моделям</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-high">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">6.3 — Расчёт справедливой цены по всем 4 моделям для каждого сценария</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-medium">
-      <div class="sub-check">○</div>
-      <div class="sub-text">6.4 — Горизонтальные бары с диапазонами: 🐂 / ⚖️ / 🐻</div>
-      <span class="sub-tag">Ожидает</span>
-    </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">6.5 — Маркер текущей цены на шкале диапазонов</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-medium">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">6.4 — Upside% с цветом и стрелкой (▲/▼) для каждого сценария, авторасчёт при открытии</div>
+      <span class="sub-tag">Done</span>
     </div>
   </div>
 </div>
@@ -640,28 +635,23 @@
 <div class="section-label">🟢 Малые улучшения</div>
 
 <!-- 10 -->
-<div class="task status-waiting" onclick="toggle(this)">
+<div class="task status-done" onclick="toggle(this)">
   <div class="task-header">
     <div class="task-num">10</div>
     <div class="task-title">Индикатор ставки ЦБ в шапке приложения</div>
-    <span class="task-status-badge">Ожидает</span>
+    <span class="task-status-badge">Завершено</span>
     <span class="task-arrow">▼</span>
   </div>
   <div class="subtasks">
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">10.1 — Блок в nav-баре: «r_f: 16.0%  r_m: 22.0%» справа</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">10.1 — Блок в nav-баре: «r_f: 16.0%  r_m: 22.0%» справа (сделано в рамках 1.5)</div>
+      <span class="sub-tag">Done</span>
     </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">10.2 — Клик по блоку → открывает страницу настроек</div>
-      <span class="sub-tag">Ожидает</span>
-    </div>
-    <div class="subtask sub-waiting priority-low">
-      <div class="sub-check">○</div>
-      <div class="sub-text">10.3 — Подтягивать реальную ставку ЦБ с сайта (cbr.ru API или парсинг)</div>
-      <span class="sub-tag">Ожидает</span>
+    <div class="subtask sub-done priority-low">
+      <div class="sub-check">✓</div>
+      <div class="sub-text">10.2 — Авто-загрузка реальной ставки ЦБ через cbr.ru XML API (сделано в рамках 1.7)</div>
+      <span class="sub-tag">Done</span>
     </div>
   </div>
 </div>
