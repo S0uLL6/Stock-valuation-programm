@@ -1044,9 +1044,13 @@ class AnalyticsPage(ctk.CTkFrame):
         self._divs_cache = []
         self._annot_price = None
         self._vline       = None
-        self._pin_idx        = None   # индекс закреплённой точки (клик)
-        self._pin_marker     = None   # маркер на графике
-        self._price_span_patch = None # зелёный коридор между точками
+        self._pin_idx        = None
+        self._pin_marker     = None
+        self._price_span_patch = None
+        self._cmp_ticker  = None
+        self._cmp_dates   = []
+        self._cmp_closes  = []
+        self._norm_mode   = True   # True = нормализованный вид, False = абсолют
         self._build()
 
     def _build(self):
@@ -1091,6 +1095,25 @@ class AnalyticsPage(ctk.CTkFrame):
             weight="bold", color=ACCENT).pack(side="left")
         self.price_info = lbl(price_hdr, "", size=12, color=MUTED)
         self.price_info.pack(side="right")
+
+        # Поле сравнения тикеров
+        self._cmp_entry = ctk.CTkEntry(
+            price_hdr, placeholder_text="Сравнить с…",
+            width=120, height=26, font=ctk.CTkFont(size=11))
+        self._cmp_entry.pack(side="left", padx=(12, 4))
+        self._cmp_entry.bind("<Return>", lambda e: self._load_compare())
+        ctk.CTkButton(
+            price_hdr, text="Сравнить", width=76, height=26,
+            fg_color=CARD2, hover_color=BORDER,
+            font=ctk.CTkFont(size=11),
+            command=self._load_compare).pack(side="left", padx=(0, 4))
+        self._cmp_clear_btn = ctk.CTkButton(
+            price_hdr, text="✕", width=26, height=26,
+            fg_color=CARD2, hover_color=RED,
+            font=ctk.CTkFont(size=11),
+            command=self._clear_compare)
+        self._cmp_clear_btn.pack(side="left", padx=(0, 8))
+        self._cmp_clear_btn.configure(state="disabled")
 
         # Чекбоксы индикаторов
         saved_ind = CONFIG.get("indicators", {})
