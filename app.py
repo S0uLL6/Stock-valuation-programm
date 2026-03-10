@@ -19,11 +19,13 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import stock_valuation as sv
 from stock_valuation import (
     ddm_price, pe_price, riv_price, dcf_price,
     get_sector_pe, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
     fetch_cbr_key_rate, fetch_moex_market_return,
+    fetch_sector_pe_live, SECTOR_PE,
     safe, _load_dotenv,
 )
 _load_dotenv()
@@ -2080,6 +2082,51 @@ class SettingsPage(ctk.CTkFrame):
         self._status_lbl = lbl(row_btn, "", size=12, color=MUTED)
         self._status_lbl.pack(side="left", padx=(16, 0))
 
+        # ── Отраслевые P/E ──────────────────────────────────────
+        lbl(wrap, "Отраслевые P/E", size=16, weight="bold").pack(
+            anchor="w", pady=(32, 4))
+        lbl(wrap, "Используются в модели сравнений (P × EPS). "
+            "Загружаются автоматически при старте приложения.",
+            size=12, color=MUTED).pack(anchor="w", pady=(0, 12))
+
+        pe_card = Card(wrap)
+        pe_card.pack(anchor="w", fill="x")
+
+        # Заголовки таблицы
+        hdr_f = ctk.CTkFrame(pe_card, fg_color="transparent")
+        hdr_f.pack(fill="x", padx=20, pady=(14, 4))
+        for txt, w in [("Сектор", 180), ("Базовый", 80), ("Актуальный", 100)]:
+            lbl(hdr_f, txt, size=11, color=MUTED, weight="bold").pack(
+                side="left", anchor="w", width=w)
+
+        Div(pe_card).pack(fill="x", padx=20, pady=2)
+
+        self._pe_rows: dict = {}   # sector → (base_lbl, live_lbl)
+        sectors_order = [
+            "Банки", "Нефть и газ", "Металлы", "Ритейл",
+            "Телеком", "Технологии", "Электроэнергетика",
+            "Удобрения", "Транспорт", "Девелопмент",
+        ]
+        for sector in sectors_order:
+            row_f = ctk.CTkFrame(pe_card, fg_color="transparent")
+            row_f.pack(fill="x", padx=20, pady=2)
+            lbl(row_f, sector, size=12).pack(side="left", anchor="w", width=180)
+            base_val = SECTOR_PE.get(sector, SECTOR_PE["default"])
+            base_l = lbl(row_f, f"{base_val:.1f}x", size=12, color=MUTED)
+            base_l.pack(side="left", anchor="w", width=80)
+            live_l = lbl(row_f, "—", size=12, color=MUTED)
+            live_l.pack(side="left", anchor="w")
+            self._pe_rows[sector] = (base_l, live_l)
+
+        pe_btn_row = ctk.CTkFrame(pe_card, fg_color="transparent")
+        pe_btn_row.pack(anchor="w", padx=20, pady=(10, 14))
+        self._pe_btn = btn(pe_btn_row, "⟳ Обновить P/E секторов",
+                           self._refresh_pe_clicked,
+                           color=CARD2, width=200, height=32)
+        self._pe_btn.pack(side="left")
+        self._pe_status = lbl(pe_btn_row, "", size=11, color=MUTED)
+        self._pe_status.pack(side="left", padx=(12, 0))
+
     def _auto_fetch(self):
         """Подтягивает ставки из интернета в фоне."""
         self._auto_btn.configure(state="disabled", text="Загружаю…")
@@ -2151,6 +2198,28 @@ class SettingsPage(ctk.CTkFrame):
                  f"r_m={_CONFIG_DEFAULTS['r_m']*100:.0f}%",
             text_color=MUTED)
         self.app._refresh_rates_label()
+
+    def _refresh_pe_clicked(self):
+        self._pe_btn.configure(state="disabled", text="Загружаю…")
+        self._pe_status.configure(text="Запрашиваю данные с MOEX и SmartLab…", text_color=MUTED)
+        threading.Thread(target=self._do_refresh_pe, daemon=True).start()
+
+    def _do_refresh_pe(self):
+        data = fetch_sector_pe_live()
+        self.after(0, lambda: self._fill_pe(data))
+
+    def _fill_pe(self, data: dict):
+        sv._LIVE_SECTOR_PE.update(data)
+        for sector, (_, live_l) in self._pe_rows.items():
+            val = data.get(sector)
+            if val:
+                live_l.configure(text=f"{val:.1f}x", text_color=GREEN)
+            else:
+                live_l.configure(text="—", text_color=MUTED)
+        self._pe_btn.configure(state="normal", text="⟳ Обновить P/E секторов")
+        now = datetime.now().strftime("%H:%M")
+        self._pe_status.configure(
+            text=f"✓ Обновлено в {now}", text_color=GREEN)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -2448,6 +2517,16 @@ class App(ctk.CTk):
         for p in (self.valuation_page, self.analytics_page,
                   self.settings_page, self.screening_page):
             p.grid(row=0, column=0, sticky="nsew")
+        # Автозагрузка отраслевых P/E при старте
+        threading.Thread(target=self._refresh_sector_pe, daemon=True).start()
+
+    def _refresh_sector_pe(self):
+        """Фоновый поток: загружает актуальные отраслевые P/E и обновляет UI."""
+        try:
+            data = fetch_sector_pe_live()
+            self.after(0, lambda: self.settings_page._fill_pe(data))
+        except Exception:
+            pass
 
     def _show_page(self, key):
         {"valuation": self.valuation_page,
