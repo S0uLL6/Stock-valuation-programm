@@ -23,6 +23,7 @@ from stock_valuation import (
     ddm_price, pe_price, riv_price, dcf_price,
     get_sector_pe, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
+    fetch_cbr_key_rate, fetch_moex_market_return,
     safe, _load_dotenv,
 )
 _load_dotenv()
@@ -1265,18 +1266,18 @@ class SettingsPage(ctk.CTkFrame):
 
         fields_cfg = [
             ("r_f", "Безрисковая ставка  r_f",
-             "Ключевая ставка ЦБ РФ (например 0.16 = 16%)",
+             "Ключевая ставка ЦБ РФ",
              "0.1600"),
             ("r_m", "Доходность рынка  r_m",
-             "Историческая доходность IMOEX (например 0.22 = 22%)",
+             "5-летний CAGR индекса MCFTR (полная доходность MOEX)",
              "0.2200"),
         ]
 
-        self._entries = {}
+        self._entries  = {}
+        self._src_lbls = {}   # подписи-источники рядом с полями
         for ri, (key, title, hint, default) in enumerate(fields_cfg):
-            # Разделитель между строками
             if ri > 0:
-                Div(card).grid(row=ri*3 - 1, column=0, columnspan=2,
+                Div(card).grid(row=ri*3 - 1, column=0, columnspan=3,
                                padx=20, pady=0, sticky="ew")
 
             lbl(card, title, size=13, weight="bold").grid(
@@ -1287,19 +1288,65 @@ class SettingsPage(ctk.CTkFrame):
             e = inp(card, width=160, ph=default)
             e.insert(0, str(CONFIG.get(key, default)))
             e.grid(row=ri*3, column=1, rowspan=2,
-                   padx=(0, 20), pady=16, sticky="w")
+                   padx=(0, 12), pady=16, sticky="w")
             self._entries[key] = e
 
-        # Кнопка применить + статус
+            # Метка-источник (заполняется после авто-загрузки)
+            sl = lbl(card, "", size=10, color=MUTED)
+            sl.grid(row=ri*3, column=2, rowspan=2,
+                    padx=(0, 20), pady=16, sticky="w")
+            self._src_lbls[key] = sl
+
+        # ── Кнопки ─────────────────────────────────────────────
         row_btn = ctk.CTkFrame(wrap, fg_color="transparent")
         row_btn.pack(anchor="w", pady=(16, 0))
 
+        self._auto_btn = btn(row_btn, "⟳ Загрузить из интернета",
+                             self._auto_fetch,
+                             color=ACCENT, width=220, height=38)
+        self._auto_btn.pack(side="left")
         btn(row_btn, "Применить", self._apply,
-            color="#238636", width=160, height=38).pack(side="left")
-        btn(row_btn, "Сбросить к умолчаниям", self._reset,
-            color=CARD2, width=200, height=38).pack(side="left", padx=(10, 0))
+            color="#238636", width=140, height=38).pack(side="left", padx=(10, 0))
+        btn(row_btn, "Сбросить", self._reset,
+            color=CARD2, width=120, height=38).pack(side="left", padx=(10, 0))
         self._status_lbl = lbl(row_btn, "", size=12, color=MUTED)
         self._status_lbl.pack(side="left", padx=(16, 0))
+
+    def _auto_fetch(self):
+        """Подтягивает ставки из интернета в фоне."""
+        self._auto_btn.configure(state="disabled", text="Загружаю…")
+        self._status_lbl.configure(text="", text_color=MUTED)
+
+        def worker():
+            results = {}
+            # 1. ЦБ РФ ключевая ставка
+            date_s, r_f = fetch_cbr_key_rate()
+            if r_f is not None:
+                results["r_f"] = (r_f, f"ЦБ РФ от {date_s}")
+            # 2. MOEX историческая доходность (5 лет)
+            cagr, desc = fetch_moex_market_return(years=5)
+            if cagr is not None:
+                results["r_m"] = (cagr, desc)
+            self.after(0, lambda: self._fill_auto(results))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _fill_auto(self, results):
+        self._auto_btn.configure(state="normal", text="⟳ Загрузить из интернета")
+        if not results:
+            self._status_lbl.configure(
+                text="Не удалось загрузить — проверь интернет", text_color=RED)
+            return
+        for key, (val, src) in results.items():
+            e = self._entries[key]
+            e.delete(0, "end")
+            e.insert(0, f"{val:.4f}")
+            self._src_lbls[key].configure(text=src, text_color=GREEN)
+        loaded = ", ".join(
+            f"{k}={v*100:.2f}%" for k, (v, _) in results.items())
+        self._status_lbl.configure(
+            text=f"✓ Загружено: {loaded}  — нажми «Применить»",
+            text_color=GREEN)
 
     def _apply(self):
         try:
