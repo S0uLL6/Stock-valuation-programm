@@ -575,6 +575,23 @@ class ValuationPage(ctk.CTkFrame):
         ms = interval_map.get(self._interval_var.get(), 300_000)
         self._auto_job = self.after(ms, self._do_auto_update)
 
+    def _apply_auto_price(self, ticker, price):
+        self._loaded_price = price
+        # Пересчитываем upside если есть данные расчёта
+        if self.data and self.data.get("ticker") == ticker:
+            avg = self.data.get("avg", 0)
+            upside = (avg / price - 1) * 100 if price and avg else 0
+            self.data["price"] = price
+            self.data["upside"] = upside
+            if upside > 0:
+                self.upside_lbl.configure(
+                    text=f"▲ +{upside:.1f}% потенциал", text_color=GREEN)
+                self.fair_card.configure(border_color=GREEN)
+            elif upside < 0:
+                self.upside_lbl.configure(
+                    text=f"▼ {upside:.1f}% переоценена", text_color=RED)
+                self.fair_card.configure(border_color=RED)
+
     def _pick_pdf(self):
         p = filedialog.askopenfilename(
             filetypes=[("PDF", "*.pdf")], title="Выбери МСФО отчёт")
