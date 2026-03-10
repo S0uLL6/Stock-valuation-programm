@@ -759,6 +759,27 @@ class ValuationPage(ctk.CTkFrame):
         except (ValueError, TypeError):
             return default
 
+    def _reset_fields(self):
+        # 13.2 — Очистка полей ввода
+        for e in self.fields.values():
+            e.delete(0, "end")
+        # 13.3 — Сброс карточек результатов
+        for card in self.model_cards.values():
+            card.configure(text="—")
+        self.fair_val.configure(text="—")
+        self.upside_lbl.configure(text="", text_color=MUTED)
+        self.models_used.configure(text="")
+        self.fair_card.configure(border_color=BORDER)
+        # 13.4 — Сброс PDF
+        self.pdf_path = None
+        self.pdf_lbl.configure(text="PDF: не выбран", text_color=MUTED)
+        # 13.5 — Сброс загруженных данных
+        self._loaded_price = 0
+        self._loaded_d0    = 0
+        self._loaded_name  = ""
+        self.data = None
+        self._status("Поля сброшены", MUTED)
+
     def _calculate(self):
         ticker = self.ticker_e.get().strip().upper().replace(".ME","")
         if not ticker or self._loaded_price == 0:
