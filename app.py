@@ -874,6 +874,20 @@ class AnalyticsPage(ctk.CTkFrame):
         self.price_info = lbl(price_hdr, "", size=12, color=MUTED)
         self.price_info.pack(side="right")
 
+        # Чекбоксы индикаторов
+        saved_ind = CONFIG.get("indicators", {})
+        self._ind_vars = {}
+        ind_cfg = [("SMA20","SMA 20"), ("SMA50","SMA 50"),
+                   ("SMA200","SMA 200"), ("EMA20","EMA 20")]
+        for key, label in ind_cfg:
+            var = tk.BooleanVar(value=saved_ind.get(key, False))
+            cb = ctk.CTkCheckBox(price_hdr, text=label, variable=var,
+                                 font=ctk.CTkFont(size=11), text_color=MUTED,
+                                 fg_color=ACCENT, hover_color=BORDER,
+                                 command=self._on_indicator_toggle)
+            cb.pack(side="right", padx=(0, 6))
+            self._ind_vars[key] = var
+
         # Чекбокс «Объём»
         self._show_volume = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(price_hdr, text="Объём", variable=self._show_volume,
@@ -1075,6 +1089,16 @@ class AnalyticsPage(ctk.CTkFrame):
         self.vol_ax.set_visible(self._show_volume.get())
         self.price_canvas.draw_idle()
 
+    def _on_indicator_toggle(self):
+        CONFIG["indicators"] = {k: v.get() for k, v in self._ind_vars.items()}
+        _save_config()
+        if hasattr(self, "_price_dates") and self._price_dates:
+            self._draw_price(
+                self._price_dates, self._price_closes,
+                self._price_opens or None,
+                self._price_vols or None,
+            )
+
     # ── Рисуем цену ────────────────────────────────────────────
     def _draw_price(self, dates, closes, opens=None, volumes=None):
         ax = self.price_ax
@@ -1151,6 +1175,41 @@ class AnalyticsPage(ctk.CTkFrame):
         self._price_closes = closes
         self._price_opens  = opens or []
         self._price_vols   = volumes or []
+
+        # ── MA индикаторы ──────────────────────────────────────
+        self._price_ma = {}
+        _ma_styles = {
+            "SMA20":  ("#FF9500", 1.2, "SMA 20"),
+            "SMA50":  ("#9B59B6", 1.4, "SMA 50"),
+            "SMA200": ("#F1C40F", 1.8, "SMA 200"),
+            "EMA20":  ("#00BCD4", 1.2, "EMA 20"),
+        }
+        n = len(closes)
+        for key, (ma_color, ma_lw, ma_label) in _ma_styles.items():
+            if not self._ind_vars.get(key, tk.BooleanVar()).get():
+                continue
+            period = int(key.replace("SMA", "").replace("EMA", ""))
+            if n < period:
+                continue
+            if key.startswith("SMA"):
+                vals = [None] * (period - 1) + [
+                    sum(closes[i - period:i]) / period for i in range(period, n + 1)
+                ]
+            else:  # EMA
+                k_ema = 2 / (period + 1)
+                ema_val = sum(closes[:period]) / period
+                vals = [None] * (period - 1) + [ema_val]
+                for i in range(period, n):
+                    ema_val = closes[i] * k_ema + ema_val * (1 - k_ema)
+                    vals.append(ema_val)
+            self._price_ma[key] = vals
+            plot_d = [dates[i] for i in range(n) if vals[i] is not None]
+            plot_v = [vals[i]  for i in range(n) if vals[i] is not None]
+            ax.plot(plot_d, plot_v, color=ma_color, linewidth=ma_lw,
+                    label=ma_label, alpha=0.85)
+        if self._price_ma:
+            ax.legend(fontsize=8, loc="upper left",
+                      facecolor=CARD, edgecolor=BORDER, labelcolor=TEXT)
 
         # ── Объём ──────────────────────────────────────────────
         vax = self.vol_ax
@@ -1251,7 +1310,17 @@ class AnalyticsPage(ctk.CTkFrame):
             if hasattr(self, "_price_vols") and self._price_vols and idx < len(self._price_vols):
                 v = self._price_vols[idx]
                 vol_str = f"\nОбъём: {v/1e6:.2f}М" if v >= 1e6 else f"\nОбъём: {v:.0f}"
-            self._annot_price.set_text(f"{d.strftime(fmt)}\n{cl:.2f} ₽{vol_str}")
+            ma_str = ""
+            if hasattr(self, "_price_ma") and self._price_ma:
+                ma_parts = []
+                for _k in ("SMA20", "SMA50", "SMA200", "EMA20"):
+                    if _k in self._price_ma and idx < len(self._price_ma[_k]):
+                        _v = self._price_ma[_k][idx]
+                        if _v is not None:
+                            ma_parts.append(f"{_k}: {_v:.2f}")
+                if ma_parts:
+                    ma_str = "\n" + "  ".join(ma_parts)
+            self._annot_price.set_text(f"{d.strftime(fmt)}\n{cl:.2f} ₽{vol_str}{ma_str}")
             self._annot_price.set(
                 bbox=dict(boxstyle='round,pad=0.5', fc=CARD, ec=ACCENT, lw=1))
 
