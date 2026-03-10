@@ -482,6 +482,9 @@ class ValuationPage(ctk.CTkFrame):
                         anchor="w", padx=6)
                     cl.grid(row=ri, column=ci, sticky="ew", ipady=4)
 
+        if sorted_items:
+            self._append_total_row(len(sorted_items))
+
     def _calc_portfolio_stats(self):
         """Возвращает (weighted_upside, total_weight) по портфелю."""
         weighted_sum = 0.0
@@ -494,6 +497,27 @@ class ValuationPage(ctk.CTkFrame):
                 weight_sum   += w
         w_upside = weighted_sum / weight_sum if weight_sum else 0
         return w_upside, weight_sum
+
+    def _append_total_row(self, ri):
+        """Добавляет строку «Итого» после всех тикеров."""
+        w_upside, weight_sum = self._calc_portfolio_stats()
+        up_color = GREEN if w_upside > 0 else (RED if w_upside < 0 else MUTED)
+        up_str   = f"{w_upside:+.1f}%" if weight_sum else "—"
+        wt_str   = f"{weight_sum:.1f}%"
+
+        # Разделитель
+        sep = ctk.CTkFrame(self.tbl, fg_color=BORDER, height=1)
+        sep.grid(row=ri, column=0, columnspan=11, sticky="ew", pady=(4, 2))
+
+        total_vals = ["", "Итого", wt_str, "", "", "", "", "", "", up_str, ""]
+        for ci, val in enumerate(total_vals):
+            color = up_color if ci == 9 else (GOLD if ci == 1 else MUTED)
+            cl = ctk.CTkLabel(
+                self.tbl, text=val,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color=color, fg_color=CARD,
+                anchor="w", padx=6)
+            cl.grid(row=ri + 1, column=ci, sticky="ew", ipady=4)
 
     def _update_weight(self, ticker, entry_widget):
         try:
