@@ -874,9 +874,20 @@ class AnalyticsPage(ctk.CTkFrame):
         self.price_info = lbl(price_hdr, "", size=12, color=MUTED)
         self.price_info.pack(side="right")
 
-        self.price_fig = Figure(figsize=(10, 3.5), dpi=96)
+        # Чекбокс «Объём»
+        self._show_volume = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(price_hdr, text="Объём", variable=self._show_volume,
+                        font=ctk.CTkFont(size=11), text_color=MUTED,
+                        fg_color=ACCENT, hover_color=BORDER,
+                        command=self._on_volume_toggle).pack(
+                        side="right", padx=(0, 12))
+
+        self.price_fig = Figure(figsize=(10, 4.2), dpi=96)
         self.price_fig.patch.set_facecolor(CARD)
-        self.price_ax  = self.price_fig.add_subplot(111)
+        # 2 субплота: 75% цена, 25% объём
+        self.price_ax  = self.price_fig.add_axes([0.07, 0.30, 0.90, 0.63])
+        self.vol_ax    = self.price_fig.add_axes([0.07, 0.05, 0.90, 0.22],
+                                                  sharex=self.price_ax)
         self.price_canvas = FigureCanvasTkAgg(self.price_fig, master=pc)
         self.price_canvas.get_tk_widget().grid(
             row=1, padx=8, pady=(0,10), sticky="nsew")
@@ -1010,7 +1021,6 @@ class AnalyticsPage(ctk.CTkFrame):
 
     def _apply_period(self, p):
         if p == "1Д":
-            # Интрадей — грузим отдельно минутки за сегодня
             threading.Thread(
                 target=self._fetch_intraday,
                 args=(self.current_ticker,), daemon=True).start()
@@ -1018,22 +1028,18 @@ class AnalyticsPage(ctk.CTkFrame):
         if not self._all_dates:
             return
         days, _ = PERIODS[p]
+        all_v = list(zip(self._all_dates, self._all_closes,
+                         self._all_opens  or [None]*len(self._all_dates),
+                         self._all_volumes or [0]*len(self._all_dates)))
         if days == 0:
-            dates  = list(self._all_dates)
-            closes = list(self._all_closes)
+            filtered = all_v
         else:
             cutoff = datetime.now() - timedelta(days=days)
-            pairs  = [(d,c) for d,c in zip(self._all_dates, self._all_closes)
-                      if d >= cutoff]
-            if not pairs:
-                # Нет данных за период — берём последние доступные точки
-                n = min(30, len(self._all_dates))
-                dates  = self._all_dates[-n:]
-                closes = self._all_closes[-n:]
-            else:
-                dates, closes = zip(*pairs)
-                dates, closes = list(dates), list(closes)
-        self._draw_price(dates, closes)
+            filtered = [(d, c, o, v) for d, c, o, v in all_v if d >= cutoff]
+            if not filtered:
+                filtered = all_v[-min(30, len(all_v)):]
+        dates, closes, opens, volumes = map(list, zip(*filtered)) if filtered else ([], [], [], [])
+        self._draw_price(dates, closes, opens, volumes)
 
     def _fetch_intraday(self, ticker):
         """Минутные/10-минутные свечи за последние 2 дня."""
@@ -1065,8 +1071,12 @@ class AnalyticsPage(ctk.CTkFrame):
         except Exception as e:
             self.after(0, lambda: self._apply_period("1Н"))
 
+    def _on_volume_toggle(self):
+        self.vol_ax.set_visible(self._show_volume.get())
+        self.price_canvas.draw_idle()
+
     # ── Рисуем цену ────────────────────────────────────────────
-    def _draw_price(self, dates, closes):
+    def _draw_price(self, dates, closes, opens=None, volumes=None):
         ax = self.price_ax
         ax.clear()
         ax.set_facecolor(CARD2)
@@ -1139,6 +1149,28 @@ class AnalyticsPage(ctk.CTkFrame):
 
         self._price_dates  = dates
         self._price_closes = closes
+        self._price_opens  = opens or []
+        self._price_vols   = volumes or []
+
+        # ── Объём ──────────────────────────────────────────────
+        vax = self.vol_ax
+        vax.clear()
+        vax.set_facecolor(CARD2)
+        if volumes and opens and self._show_volume.get():
+            bar_colors = [GREEN if c >= o else RED
+                          for c, o in zip(closes, opens)]
+            vax.bar(dates, volumes, color=bar_colors, alpha=0.7, width=1.0)
+            vax.set_ylabel("Объём", color=MUTED, fontsize=8)
+            vax.yaxis.set_major_formatter(
+                plt.FuncFormatter(lambda x, _: f"{x/1e6:.0f}М" if x >= 1e6 else f"{x:.0f}"))
+            vax.tick_params(axis="y", labelsize=7, colors=MUTED)
+            vax.tick_params(axis="x", labelbottom=False)
+            vax.grid(True, axis="y", alpha=0.2, linestyle="--")
+            for sp in vax.spines.values():
+                sp.set_color(BORDER)
+        else:
+            vax.set_visible(False)
+        vax.set_visible(bool(volumes) and self._show_volume.get())
 
         # Изменение за период
         chg = (closes[-1]/closes[0] - 1)*100 if closes[0] else 0
@@ -1146,7 +1178,6 @@ class AnalyticsPage(ctk.CTkFrame):
         self.price_info.configure(
             text=f"{closes[-1]:.2f} ₽   {chg:+.1f}%", text_color=chg_color)
 
-        self.price_fig.subplots_adjust(top=0.95, bottom=0.18, left=0.08, right=0.97)
         self.price_canvas.draw()
 
     # ── Hover на графике цены ──────────────────────────────────
@@ -1216,7 +1247,11 @@ class AnalyticsPage(ctk.CTkFrame):
                 try: self._price_span_patch.remove()
                 except: pass
                 self._price_span_patch = None
-            self._annot_price.set_text(f"{d.strftime(fmt)}\n{cl:.2f} ₽")
+            vol_str = ""
+            if hasattr(self, "_price_vols") and self._price_vols and idx < len(self._price_vols):
+                v = self._price_vols[idx]
+                vol_str = f"\nОбъём: {v/1e6:.2f}М" if v >= 1e6 else f"\nОбъём: {v:.0f}"
+            self._annot_price.set_text(f"{d.strftime(fmt)}\n{cl:.2f} ₽{vol_str}")
             self._annot_price.set(
                 bbox=dict(boxstyle='round,pad=0.5', fc=CARD, ec=ACCENT, lw=1))
 
