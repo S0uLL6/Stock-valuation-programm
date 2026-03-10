@@ -6,7 +6,7 @@ pip install customtkinter matplotlib requests beautifulsoup4 openpyxl
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog
-import threading, sys, os, requests, math
+import threading, sys, os, requests, math, json
 from datetime import datetime, timedelta
 
 import matplotlib
@@ -32,6 +32,26 @@ try:
     OPENPYXL_OK = True
 except ImportError:
     OPENPYXL_OK = False
+
+# ── Конфиг (ставки дисконтирования) ────────────────────────────
+_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+_CONFIG_DEFAULTS = {"r_f": 0.16, "r_m": 0.22}
+CONFIG = dict(_CONFIG_DEFAULTS)
+
+def _load_config():
+    global CONFIG
+    if os.path.exists(_CONFIG_PATH):
+        try:
+            with open(_CONFIG_PATH, "r") as f:
+                CONFIG.update(json.load(f))
+        except Exception:
+            pass
+
+def _save_config():
+    with open(_CONFIG_PATH, "w") as f:
+        json.dump(CONFIG, f, indent=2)
+
+_load_config()
 
 # ── Цвета ──────────────────────────────────────────────────────
 BG      = "#0D1117"
@@ -1265,9 +1285,39 @@ class SettingsPage(ctk.CTkFrame):
                 row=ri*3+1, column=0, padx=(20, 40), pady=(0, 16), sticky="w")
 
             e = inp(card, width=160, ph=default)
+            e.insert(0, str(CONFIG.get(key, default)))
             e.grid(row=ri*3, column=1, rowspan=2,
                    padx=(0, 20), pady=16, sticky="w")
             self._entries[key] = e
+
+        # Кнопка применить + статус
+        row_btn = ctk.CTkFrame(wrap, fg_color="transparent")
+        row_btn.pack(anchor="w", pady=(16, 0))
+
+        btn(row_btn, "Применить", self._apply,
+            color="#238636", width=160, height=38).pack(side="left")
+        self._status_lbl = lbl(row_btn, "", size=12, color=MUTED)
+        self._status_lbl.pack(side="left", padx=(16, 0))
+
+    def _apply(self):
+        try:
+            r_f = float(self._entries["r_f"].get().strip())
+            r_m = float(self._entries["r_m"].get().strip())
+        except ValueError:
+            self._status_lbl.configure(
+                text="Ошибка: введи числа (например 0.16)", text_color=RED)
+            return
+        if not (0 < r_f < 1) or not (0 < r_m < 1):
+            self._status_lbl.configure(
+                text="Значения должны быть от 0 до 1", text_color=RED)
+            return
+        CONFIG["r_f"] = r_f
+        CONFIG["r_m"] = r_m
+        _save_config()
+        self._status_lbl.configure(
+            text=f"✓ Сохранено: r_f={r_f*100:.2f}%  r_m={r_m*100:.2f}%",
+            text_color=GREEN)
+        self.app._refresh_rates_label()
 
 
 # ═══════════════════════════════════════════════════════════════
