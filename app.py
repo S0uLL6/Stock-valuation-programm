@@ -577,6 +577,7 @@ class ValuationPage(ctk.CTkFrame):
 
     def _apply_auto_price(self, ticker, price):
         self._loaded_price = price
+        ts = datetime.now().strftime("%H:%M:%S")
         # Пересчитываем upside если есть данные расчёта
         if self.data and self.data.get("ticker") == ticker:
             avg = self.data.get("avg", 0)
@@ -591,6 +592,7 @@ class ValuationPage(ctk.CTkFrame):
                 self.upside_lbl.configure(
                     text=f"▼ {upside:.1f}% переоценена", text_color=RED)
                 self.fair_card.configure(border_color=RED)
+        self._status(f"⟳ Обновлено: {ts}  Цена: {price:.2f} ₽", MUTED)
 
     def _pick_pdf(self):
         p = filedialog.askopenfilename(
