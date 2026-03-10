@@ -1326,6 +1326,39 @@ class AnalyticsPage(ctk.CTkFrame):
         except Exception as e:
             self.after(0, lambda: self._apply_period("1Н"))
 
+    def _load_compare(self):
+        ticker = self._cmp_entry.get().strip().upper().replace(".ME", "")
+        if not ticker or not self.current_ticker:
+            return
+        self._cmp_ticker = ticker
+        self._cmp_dates  = []
+        self._cmp_closes = []
+        def worker():
+            try:
+                dates, closes, _, _ = self._fetch_candles_all(ticker)
+                cutoff10 = datetime.now() - timedelta(days=3650)
+                pairs = [(d, c) for d, c in zip(dates, closes) if d >= cutoff10]
+                if pairs:
+                    ds, cs = map(list, zip(*pairs))
+                else:
+                    ds, cs = [], []
+                self._cmp_dates  = ds
+                self._cmp_closes = cs
+                self.after(0, lambda: self._apply_period(self._active_period))
+                self.after(0, lambda: self._cmp_clear_btn.configure(state="normal"))
+            except Exception:
+                self._cmp_dates = []
+                self._cmp_closes = []
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _clear_compare(self):
+        self._cmp_ticker  = None
+        self._cmp_dates   = []
+        self._cmp_closes  = []
+        self._cmp_entry.delete(0, "end")
+        self._cmp_clear_btn.configure(state="disabled")
+        self._apply_period(self._active_period)
+
     def _on_volume_toggle(self):
         self.vol_ax.set_visible(self._show_volume.get())
         self.price_canvas.draw_idle()
