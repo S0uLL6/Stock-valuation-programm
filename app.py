@@ -199,7 +199,7 @@ class ValuationPage(ctk.CTkFrame):
         self.app = app
         self.data = None
         self.pdf_path = None
-        self.portfolio = {}
+        self.portfolio = _load_portfolio()
         self._loaded_price = 0
         self._loaded_name  = ""
         self._loaded_d0    = 0
@@ -207,6 +207,8 @@ class ValuationPage(ctk.CTkFrame):
         self._spinner_angle = 0
         self._spinning = False
         self._build()
+        if self.portfolio:
+            self.after(200, self._refresh_table)
 
     def _build(self):
         self.grid_columnconfigure(0, weight=0, minsize=300)
