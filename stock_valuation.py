@@ -797,6 +797,7 @@ def update_summary_sheet(wb, d: dict):
         round(avg,               2),   # Среднее (справедливая цена)
         upside,                        # Потенциал %
         round(d["eps"],          2),   # EPS
+        round(d["price"] / d["eps"] if d["eps"] > 0 else 0, 1),  # Текущий P/E
         round(get_sector_pe(d["ticker"]), 1),  # Отраслевой P/E
         round(d["bvps"],         2),   # BVPS
         round(d["roe"]*100,      1),   # ROE %
@@ -822,6 +823,7 @@ def update_summary_sheet(wb, d: dict):
         ("Справедл.",   11),
         ("Потенц.%",    10),
         ("EPS",          8),
+        ("Тек.P/E",      8),
         ("Отр.P/E",      8),
         ("BVPS",         9),
         ("ROE%",         7),
