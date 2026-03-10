@@ -309,9 +309,14 @@ class ValuationPage(ctk.CTkFrame):
 
         Div(p).grid(row=18, padx=16, pady=10, sticky="ew")
 
-        self.calc_btn = btn(p, "Рассчитать", self._calculate,
-                            color="#238636", width=200, height=40)
-        self.calc_btn.grid(row=19, padx=16, pady=(0,4), sticky="ew")
+        calc_row = ctk.CTkFrame(p, fg_color="transparent")
+        calc_row.grid(row=19, padx=16, pady=(0,4), sticky="ew")
+        calc_row.grid_columnconfigure(0, weight=1)
+        self.calc_btn = btn(calc_row, "Рассчитать", self._calculate,
+                            color="#238636", height=40)
+        self.calc_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        btn(calc_row, "✕ Сбросить", self._reset_fields,
+            color=CARD2, width=90, height=40).grid(row=0, column=1)
 
         # Блок добавления в портфель
         add_frame = ctk.CTkFrame(p, fg_color=CARD2, corner_radius=8)
