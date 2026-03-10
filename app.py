@@ -1983,6 +1983,240 @@ class SettingsPage(ctk.CTkFrame):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  Страница 4 — Скрининг
+# ═══════════════════════════════════════════════════════════════
+class ScreeningPage(ctk.CTkFrame):
+    _COLS = [
+        ("ticker",  "Тикер",           80),
+        ("name",    "Название",        180),
+        ("price",   "Цена, ₽",         90),
+        ("fair",    "Справ. цена, ₽",  110),
+        ("upside",  "Upside, %",        90),
+    ]
+
+    def __init__(self, parent, app, **kw):
+        super().__init__(parent, fg_color=BG, **kw)
+        self.app = app
+        self._results    = []   # список dict с результатами
+        self._sort_col   = "upside"
+        self._sort_rev   = True
+        self._total      = 0
+        self._done       = 0
+        self._build()
+
+    def _build(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        # Заголовок
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.grid(row=0, padx=16, pady=(14, 6), sticky="ew")
+        lbl(hdr, "Скрининг акций", size=15, weight="bold").pack(side="left")
+
+        # Панель ввода
+        inp_card = Card(self)
+        inp_card.grid(row=1, padx=16, pady=(0, 6), sticky="ew")
+        inp_card.grid_columnconfigure(0, weight=1)
+
+        top_row = ctk.CTkFrame(inp_card, fg_color="transparent")
+        top_row.grid(row=0, padx=16, pady=(12, 6), sticky="ew")
+        top_row.grid_columnconfigure(0, weight=1)
+
+        lbl(top_row, "Тикеры (через запятую):", size=11,
+            color=MUTED).grid(row=0, column=0, sticky="w")
+
+        self._ticker_entry = ctk.CTkEntry(
+            top_row, placeholder_text="SBER, LKOH, GAZP, NVTK, GMKN…",
+            height=34, font=ctk.CTkFont(size=12))
+        self._ticker_entry.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+        self._ticker_entry.bind("<Return>", lambda e: self._start_screen())
+
+        btn_col = ctk.CTkFrame(top_row, fg_color="transparent")
+        btn_col.grid(row=1, column=1)
+        btn(btn_col, "Скринить", self._start_screen,
+            color=ACCENT, width=100, height=34).pack(side="left", padx=(0, 6))
+        btn(btn_col, "Импорт из портфеля", self._import_portfolio,
+            color=CARD2, width=160, height=34).pack(side="left")
+
+        # Прогресс
+        prog_row = ctk.CTkFrame(inp_card, fg_color="transparent")
+        prog_row.grid(row=1, padx=16, pady=(0, 12), sticky="ew")
+        prog_row.grid_columnconfigure(0, weight=1)
+        self._prog_bar = ctk.CTkProgressBar(prog_row, height=6)
+        self._prog_bar.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self._prog_bar.set(0)
+        self._prog_lbl = lbl(prog_row, "", size=11, color=MUTED)
+        self._prog_lbl.grid(row=0, column=1)
+
+        # Таблица
+        import tkinter.ttk as ttk
+        tbl_card = Card(self)
+        tbl_card.grid(row=2, padx=16, pady=(0, 16), sticky="nsew")
+        tbl_card.grid_columnconfigure(0, weight=1)
+        tbl_card.grid_rowconfigure(0, weight=1)
+
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Screen.Treeview",
+                         background=CARD2, foreground=TEXT,
+                         fieldbackground=CARD2, rowheight=30,
+                         font=("SF Pro Display", 12))
+        style.configure("Screen.Treeview.Heading",
+                         background=CARD, foreground=MUTED,
+                         font=("SF Pro Display", 11, "bold"), relief="flat")
+        style.map("Screen.Treeview",
+                  background=[("selected", ACCENT)],
+                  foreground=[("selected", TEXT)])
+
+        self._tree = ttk.Treeview(
+            tbl_card, style="Screen.Treeview",
+            columns=[c[0] for c in self._COLS],
+            show="headings", selectmode="browse")
+
+        for col_id, col_name, col_w in self._COLS:
+            self._tree.heading(col_id, text=col_name,
+                               command=lambda c=col_id: self._sort_by(c))
+            self._tree.column(col_id, width=col_w, anchor="center",
+                              minwidth=60, stretch=True)
+        self._tree.column("name", anchor="w")
+
+        sb = ttk.Scrollbar(tbl_card, orient="vertical",
+                           command=self._tree.yview)
+        self._tree.configure(yscrollcommand=sb.set)
+        self._tree.grid(row=0, column=0, sticky="nsew")
+        sb.grid(row=0, column=1, sticky="ns")
+        tbl_card.grid_columnconfigure(0, weight=1)
+
+        self._tree.bind("<Double-1>", self._on_row_click)
+        self._tree.tag_configure("green", foreground=GREEN)
+        self._tree.tag_configure("red",   foreground=RED)
+
+    def _import_portfolio(self):
+        portfolio = self.app.valuation_page.portfolio
+        if not portfolio:
+            return
+        tickers = ", ".join(portfolio.keys())
+        self._ticker_entry.delete(0, "end")
+        self._ticker_entry.insert(0, tickers)
+
+    def _start_screen(self):
+        raw = self._ticker_entry.get().strip()
+        if not raw:
+            return
+        tickers = [t.strip().upper() for t in raw.split(",") if t.strip()]
+        if not tickers:
+            return
+
+        # Очищаем таблицу
+        for row in self._tree.get_children():
+            self._tree.delete(row)
+        self._results = []
+        self._total   = len(tickers)
+        self._done    = 0
+        self._prog_bar.set(0)
+        self._prog_lbl.configure(text=f"0 / {self._total}")
+
+        from concurrent.futures import ThreadPoolExecutor
+        def run():
+            with ThreadPoolExecutor(max_workers=5) as ex:
+                for ticker in tickers:
+                    ex.submit(self._fetch_one, ticker)
+        threading.Thread(target=run, daemon=True).start()
+
+    def _fetch_one(self, ticker):
+        try:
+            price = moex_price(ticker)
+            name  = moex_name(ticker)
+            sl    = fetch_smartlab(ticker)
+            divs  = moex_dividends(ticker)
+            d0 = 0.0
+            if divs:
+                cutoff = (datetime.now().replace(
+                    year=datetime.now().year - 1)).strftime("%Y-%m-%d")
+                recent = [v for dt, v in divs if dt >= cutoff]
+                d0 = sum(recent) if recent else sum(v for _, v in divs[-4:])
+
+            r_f = CONFIG["r_f"]; r_m = CONFIG["r_m"]
+            eps  = sl.get("eps", 0) or 0
+            bvps = sl.get("bvps", 0) or 0
+            roe  = sl.get("roe", 0.15) or 0.15
+            g    = sl.get("g", 0.08) or 0.08
+            beta = sl.get("beta", 1.0) or 1.0
+            r_capm = r_f + beta * (r_m - r_f)
+            d1 = d0 * (1 + g)
+            r_ddm = (d1 / price + g) if price and d1 else r_capm
+            r_ddm = max(min(r_ddm, 0.60), r_f)
+            r_avg = (r_capm + r_ddm) / 2
+            pv_ri = sum((roe - r_avg) * bvps / (1 + r_avg) ** t
+                        for t in range(1, 6)) if r_avg else 0
+
+            d = dict(ticker=ticker, name=name, price=price,
+                     d0=d0, d1=d1, g=g, k=r_avg,
+                     eps=eps, pe=(price / eps if eps > 0 else 0),
+                     bvps=bvps, pv_ri=pv_ri, roe=roe,
+                     beta=beta, r_f=r_f, r_m=r_m,
+                     r_capm=r_capm, r_ddm=r_ddm, r_avg=r_avg,
+                     currency="₽")
+            models = [v for v in [ddm_price(d), pe_price(d),
+                                  riv_price(d), dcf_price(d)] if v > 0]
+            fair = sum(models) / len(models) if models else 0
+            upside = (fair / price - 1) * 100 if price and fair else 0
+            result = dict(ticker=ticker, name=name or ticker,
+                          price=price, fair=fair, upside=upside)
+        except Exception:
+            result = dict(ticker=ticker, name="—", price=0, fair=0, upside=0)
+        self.after(0, lambda r=result: self._add_result(r))
+
+    def _add_result(self, r):
+        self._results.append(r)
+        self._done += 1
+        self._prog_bar.set(self._done / self._total if self._total else 0)
+        self._prog_lbl.configure(text=f"{self._done} / {self._total}")
+        self._refresh_table()
+
+    def _refresh_table(self):
+        key = self._sort_col
+        rev = self._sort_rev
+        try:
+            sorted_res = sorted(self._results,
+                                key=lambda x: x.get(key, 0) or 0,
+                                reverse=rev)
+        except Exception:
+            sorted_res = self._results
+        for row in self._tree.get_children():
+            self._tree.delete(row)
+        for r in sorted_res:
+            up = r.get("upside", 0)
+            tag = "green" if up > 0 else ("red" if up < 0 else "")
+            up_str = f"+{up:.1f}%" if up > 0 else f"{up:.1f}%"
+            self._tree.insert("", "end", iid=r["ticker"], tags=(tag,), values=(
+                r["ticker"],
+                r["name"],
+                f"{r['price']:.2f}" if r["price"] else "—",
+                f"{r['fair']:.2f}"  if r["fair"]  else "—",
+                up_str if r["fair"] else "—",
+            ))
+
+    def _sort_by(self, col):
+        if self._sort_col == col:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col = col
+            self._sort_rev = col in ("upside", "fair", "price")
+        self._refresh_table()
+
+    def _on_row_click(self, event):
+        sel = self._tree.selection()
+        if not sel:
+            return
+        ticker = sel[0]
+        self.app.valuation_page.ticker_e.delete(0, "end")
+        self.app.valuation_page.ticker_e.insert(0, ticker)
+        self.app._show_page("valuation")
+        self.app.valuation_page._load_data()
+
+
+# ═══════════════════════════════════════════════════════════════
 #  Главное окно
 # ═══════════════════════════════════════════════════════════════
 class App(ctk.CTk):
@@ -2009,6 +2243,7 @@ class App(ctk.CTk):
         bf.pack(side="left", padx=16)
         for key, name in [("valuation","Оценка"),
                            ("analytics","График & Дивиденды"),
+                           ("screening","Скрининг"),
                            ("settings", "Настройки")]:
             b = ctk.CTkButton(
                 bf, text=name, width=180, height=32,
@@ -2035,16 +2270,19 @@ class App(ctk.CTk):
         c.grid_columnconfigure(0, weight=1)
         c.grid_rowconfigure(0, weight=1)
 
-        self.analytics_page = AnalyticsPage(c)
+        self.analytics_page  = AnalyticsPage(c)
         self.valuation_page  = ValuationPage(c, app=self)
         self.settings_page   = SettingsPage(c, app=self)
-        for p in (self.valuation_page, self.analytics_page, self.settings_page):
+        self.screening_page  = ScreeningPage(c, app=self)
+        for p in (self.valuation_page, self.analytics_page,
+                  self.settings_page, self.screening_page):
             p.grid(row=0, column=0, sticky="nsew")
 
     def _show_page(self, key):
         {"valuation": self.valuation_page,
          "analytics": self.analytics_page,
-         "settings":  self.settings_page}[key].tkraise()
+         "settings":  self.settings_page,
+         "screening": self.screening_page}[key].tkraise()
         for k, b in self.nav_btns.items():
             b.configure(fg_color=CARD2 if k==key else "transparent",
                         text_color=TEXT  if k==key else MUTED)
