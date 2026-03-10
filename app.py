@@ -1236,7 +1236,38 @@ class SettingsPage(ctk.CTkFrame):
 
         lbl(wrap, "Настройки", size=22, weight="bold").pack(anchor="w")
         lbl(wrap, "Параметры ставок дисконтирования",
-            size=13, color=MUTED).pack(anchor="w", pady=(4, 0))
+            size=13, color=MUTED).pack(anchor="w", pady=(4, 24))
+
+        # ── Карточка с полями ───────────────────────────────────
+        card = Card(wrap)
+        card.pack(anchor="w")
+        card.grid_columnconfigure(1, weight=1)
+
+        fields_cfg = [
+            ("r_f", "Безрисковая ставка  r_f",
+             "Ключевая ставка ЦБ РФ (например 0.16 = 16%)",
+             "0.1600"),
+            ("r_m", "Доходность рынка  r_m",
+             "Историческая доходность IMOEX (например 0.22 = 22%)",
+             "0.2200"),
+        ]
+
+        self._entries = {}
+        for ri, (key, title, hint, default) in enumerate(fields_cfg):
+            # Разделитель между строками
+            if ri > 0:
+                Div(card).grid(row=ri*3 - 1, column=0, columnspan=2,
+                               padx=20, pady=0, sticky="ew")
+
+            lbl(card, title, size=13, weight="bold").grid(
+                row=ri*3, column=0, padx=(20, 40), pady=(20, 2), sticky="w")
+            lbl(card, hint, size=11, color=MUTED).grid(
+                row=ri*3+1, column=0, padx=(20, 40), pady=(0, 16), sticky="w")
+
+            e = inp(card, width=160, ph=default)
+            e.grid(row=ri*3, column=1, rowspan=2,
+                   padx=(0, 20), pady=16, sticky="w")
+            self._entries[key] = e
 
 
 # ═══════════════════════════════════════════════════════════════
