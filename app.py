@@ -865,7 +865,9 @@ class ValuationPage(ctk.CTkFrame):
                 text=f"{val:.2f} ₽" if val > 0 else "—")
 
         self.fair_val.configure(text=f"{avg:.2f} ₽" if avg else "—")
-        self.models_used.configure(text=f"из {len(models)} моделей")
+        weights_str = "  ".join(
+            f"{k.upper()} {int(w*100)}%" for k, w in active_weights.items())
+        self.models_used.configure(text=weights_str)
 
         if upside > 0:
             self.upside_lbl.configure(
@@ -2400,9 +2402,7 @@ class ScreeningPage(ctk.CTkFrame):
                      beta=beta, r_f=r_f, r_m=r_m,
                      r_capm=r_capm, r_ddm=r_ddm, r_avg=r_avg,
                      currency="₽")
-            models = [v for v in [ddm_price(d), pe_price(d),
-                                  riv_price(d), dcf_price(d)] if v > 0]
-            fair = sum(models) / len(models) if models else 0
+            fair, _ = weighted_fair_price(d)
             upside = (fair / price - 1) * 100 if price and fair else 0
             result = dict(ticker=ticker, name=name or ticker,
                           price=price, fair=fair, upside=upside)
