@@ -244,6 +244,7 @@ class ValuationPage(ctk.CTkFrame):
         self._loaded_price = 0
         self._loaded_name  = ""
         self._loaded_d0    = 0
+        self._sl_extra     = {}
         self._tooltip_win  = None
         self._spinner_angle = 0
         self._spinning = False
@@ -808,6 +809,10 @@ class ValuationPage(ctk.CTkFrame):
         self._loaded_price = d.get("price", 0)
         self._loaded_name  = d.get("name", "")
         self._loaded_d0    = d.get("d0", 0)
+        # Сохраняем расширенные данные SmartLab для расчётов
+        self._sl_extra = {k: d[k] for k in
+            ("ebitda","net_debt","fcf","de_ratio","shares","revenue","net_profit")
+            if k in d}
         self._status(
             f"✓ {d.get('name','')}  Цена: {d.get('price',0):.2f} ₽", GREEN)
         for key in ("eps","bvps","roe","g","beta"):
@@ -845,6 +850,7 @@ class ValuationPage(ctk.CTkFrame):
         self._loaded_price = 0
         self._loaded_d0    = 0
         self._loaded_name  = ""
+        self._sl_extra     = {}
         self.data = None
         self._status("Поля сброшены", MUTED)
 
@@ -899,7 +905,7 @@ class ValuationPage(ctk.CTkFrame):
                  bvps=bvps, pv_ri=pv_ri, roe=roe,
                  beta=beta, r_f=r_f, r_m=r_m,
                  r_capm=r_capm, r_ddm=r_ddm, r_avg=r_avg,
-                 currency="₽")
+                 currency="₽", **self._sl_extra)
 
         ddm = ddm_price(d); cmp = pe_price(d)
         riv = riv_price(d); dcf = dcf_price(d)
