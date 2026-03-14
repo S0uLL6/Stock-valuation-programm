@@ -848,9 +848,10 @@ def riv_price(d: dict) -> float:
 
 
 def dcf_price(d: dict) -> float:
-    """Упрощённый DCF через нормализованный FCF.
+    """DCF через FCF (свободный денежный поток).
 
-    FCF = EPS × payout_ratio  (дивиденды / прибыль, но не >1).
+    Если доступен реальный FCF (из SmartLab) — используем его.
+    Иначе fallback: FCF = EPS × payout_ratio.
     Прогнозируем FCF на T лет с ростом g_proj = min(g, 20%),
     затем терминальная стоимость с g_term = min(g, 4%).
     Минимальный спред k − g_term ≥ 5% — защита от взрыва TV.
@@ -862,13 +863,23 @@ def dcf_price(d: dict) -> float:
     if eps <= 0 or k <= 0:
         return 0.0
 
-    # Fix 1: FCF = EPS × payout_ratio (а не чистый EPS)
-    d0 = d.get("d0", 0.0)
-    if d0 > 0 and eps > 0:
-        payout = min(d0 / eps, 1.0)
+    # Приоритет: реальный FCF на акцию из SmartLab
+    fcf_raw = d.get("fcf", 0.0)
+    shares  = d.get("shares", 0.0)
+    if fcf_raw > 0 and shares > 0:
+        fcf = fcf_raw / shares  # FCF на акцию (SmartLab даёт в млн/млрд)
+    elif fcf_raw > 0 and shares == 0:
+        fcf = fcf_raw  # уже на акцию
     else:
-        payout = 0.5          # по умолчанию 50%
-    fcf = eps * payout
+        # Fallback: FCF = EPS × payout_ratio
+        d0 = d.get("d0", 0.0)
+        if d0 > 0 and eps > 0:
+            payout = min(d0 / eps, 1.0)
+        else:
+            payout = 0.5
+        fcf = eps * payout
+    if fcf <= 0:
+        return 0.0
 
     # Fix 3: прогнозный рост не выше 20% — защита от гиперроста
     g_proj = min(g, 0.20)
