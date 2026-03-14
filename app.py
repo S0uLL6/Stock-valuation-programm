@@ -883,7 +883,11 @@ class ValuationPage(ctk.CTkFrame):
                      "avg":avg,"upside":upside,
                      "cur_pe": cur_pe, "sector_pe": sector_pe}
         self._update_pe_card(cur_pe, sector_pe)
-        self._status(f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%", GREEN)
+        if g > 0.20:
+            self._status(
+                f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%  ⚠ g обрезано до 20%", GOLD)
+        else:
+            self._status(f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%", GREEN)
 
     def _show_sensitivity(self):
         if not self.data:
