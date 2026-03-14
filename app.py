@@ -280,7 +280,10 @@ class ValuationPage(ctk.CTkFrame):
 
     # ── Левая панель ───────────────────────────────────────────
     def _build_left(self):
-        p = Card(self)
+        p = ctk.CTkScrollableFrame(self, fg_color=CARD, corner_radius=12,
+                                    border_width=1, border_color=BORDER,
+                                    scrollbar_button_color=BORDER,
+                                    scrollbar_button_hover_color=MUTED)
         p.grid(row=0, column=0, rowspan=2, padx=(16,8), pady=16, sticky="nsew")
         p.grid_columnconfigure(0, weight=1)
 
