@@ -849,6 +849,39 @@ def dcf_price(d: dict) -> float:
     return pv_fcf + pv_tv
 
 
+# Веса моделей: P/E 30%, DCF 25%, RIV 25%, DDM 20%
+_MODEL_WEIGHTS = {"pe": 0.30, "dcf": 0.25, "riv": 0.25, "ddm": 0.20}
+
+
+def weighted_fair_price(d: dict) -> tuple:
+    """Взвешенная агрегация справедливой цены.
+
+    Весовая схема: P/E 30%, DCF 25%, RIV 25%, DDM 20%.
+    DDM исключается (вес=0) если d0=0 — нет дивидендов.
+    Остальные веса перенормируются.
+
+    Возвращает (цена: float, активные_веса: dict {модель: нормированный_вес}).
+    """
+    prices = {
+        "pe":  pe_price(d),
+        "dcf": dcf_price(d),
+        "riv": riv_price(d),
+        "ddm": ddm_price(d),
+    }
+    weights = dict(_MODEL_WEIGHTS)
+    # 18.2: DDM исключается если нет дивидендов
+    if d.get("d0", 0) <= 0:
+        weights["ddm"] = 0.0
+    # Нормируем по доступным моделям (цена > 0 и вес > 0)
+    active = {k: w for k, w in weights.items() if prices.get(k, 0) > 0 and w > 0}
+    total_w = sum(active.values())
+    if total_w == 0:
+        return 0.0, {}
+    normalized = {k: round(w / total_w, 3) for k, w in active.items()}
+    avg = sum(prices[k] * w for k, w in normalized.items())
+    return avg, normalized
+
+
 # ────────────────────────────────────────────────────────────────
 #  Excel
 # ────────────────────────────────────────────────────────────────
@@ -885,14 +918,9 @@ def update_summary_sheet(wb, d: dict):
         del wb[SHEET]
 
     # ── Обновляем текущий тикер ───────────────────────────────────
-    ddm = ddm_price(d); cmp = pe_price(d); riv = riv_price(d)
-    models = [v for v in [ddm, cmp, riv] if v > 0]
-    avg    = sum(models) / len(models) if models else 0
-    upside = round((avg / d["price"] - 1) * 100, 1) if d["price"] and avg else 0
-
+    ddm, cmp, riv = ddm_price(d), pe_price(d), riv_price(d)
     dcf = dcf_price(d)
-    models = [v for v in [ddm, cmp, riv, dcf] if v > 0]
-    avg    = sum(models) / len(models) if models else 0
+    avg, _ = weighted_fair_price(d)
     upside = round((avg / d["price"] - 1) * 100, 1) if d["price"] and avg else 0
 
     existing[d["ticker"]] = [

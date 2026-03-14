@@ -21,7 +21,7 @@ from matplotlib.figure import Figure
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stock_valuation as sv
 from stock_valuation import (
-    ddm_price, pe_price, riv_price, dcf_price,
+    ddm_price, pe_price, riv_price, dcf_price, weighted_fair_price,
     get_sector_pe, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
     fetch_cbr_key_rate, fetch_moex_market_return,
@@ -857,8 +857,7 @@ class ValuationPage(ctk.CTkFrame):
 
         ddm = ddm_price(d); cmp = pe_price(d)
         riv = riv_price(d); dcf = dcf_price(d)
-        models = [v for v in [ddm,cmp,riv,dcf] if v > 0]
-        avg    = sum(models)/len(models) if models else 0
+        avg, active_weights = weighted_fair_price(d)
         upside = (avg/price - 1)*100 if price and avg else 0
 
         for key, val in [("ddm",ddm),("pe",cmp),("riv",riv),("dcf",dcf)]:
