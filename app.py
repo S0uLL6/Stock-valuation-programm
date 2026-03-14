@@ -459,14 +459,18 @@ class ValuationPage(ctk.CTkFrame):
             row=0, column=0, padx=14, pady=(8,2), sticky="w")
         lbl(pe_card, "P/E отраслевой", size=11, color=MUTED).grid(
             row=0, column=1, padx=14, pady=(8,2), sticky="w")
-        lbl(pe_card, "Оценка", size=11, color=MUTED).grid(
+        lbl(pe_card, "PEG", size=11, color=MUTED).grid(
             row=0, column=2, padx=14, pady=(8,2), sticky="w")
+        lbl(pe_card, "Оценка", size=11, color=MUTED).grid(
+            row=0, column=3, padx=14, pady=(8,2), sticky="w")
         self._pe_cur_lbl    = lbl(pe_card, "—", size=18, weight="bold")
         self._pe_cur_lbl.grid(row=1, column=0, padx=14, pady=(0,8), sticky="w")
         self._pe_sec_lbl    = lbl(pe_card, "—", size=18, weight="bold", color=MUTED)
         self._pe_sec_lbl.grid(row=1, column=1, padx=14, pady=(0,8), sticky="w")
+        self._peg_lbl       = lbl(pe_card, "—", size=18, weight="bold", color=MUTED)
+        self._peg_lbl.grid(row=1, column=2, padx=14, pady=(0,8), sticky="w")
         self._pe_verdict_lbl = lbl(pe_card, "—", size=13, color=MUTED)
-        self._pe_verdict_lbl.grid(row=1, column=2, padx=14, pady=(0,8), sticky="w")
+        self._pe_verdict_lbl.grid(row=1, column=3, padx=14, pady=(0,8), sticky="w")
 
         # Итог
         self.fair_card = Card(f)
@@ -859,6 +863,7 @@ class ValuationPage(ctk.CTkFrame):
         self.fair_card.configure(border_color=BORDER)
         self._pe_cur_lbl.configure(text="—", text_color=TEXT)
         self._pe_sec_lbl.configure(text="—", text_color=MUTED)
+        self._peg_lbl.configure(text="—", text_color=MUTED)
         self._pe_verdict_lbl.configure(text="—", text_color=MUTED)
         # 13.4 — Сброс PDF
         self.pdf_path = None
@@ -877,9 +882,23 @@ class ValuationPage(ctk.CTkFrame):
         else:
             self._pe_cur_lbl.configure(text="—", text_color=MUTED)
             self._pe_sec_lbl.configure(text="—")
+            self._peg_lbl.configure(text="—", text_color=MUTED)
             self._pe_verdict_lbl.configure(text="нет EPS", text_color=MUTED)
             return
         self._pe_sec_lbl.configure(text=f"{sector_pe:.1f}", text_color=MUTED)
+        # PEG = P/E / (g * 100)
+        g = self._fval("g", 0.08)
+        if g > 0 and cur_pe > 0:
+            peg = cur_pe / (g * 100)
+            if peg < 1:
+                peg_color = GREEN
+            elif peg < 2:
+                peg_color = GOLD
+            else:
+                peg_color = RED
+            self._peg_lbl.configure(text=f"{peg:.2f}", text_color=peg_color)
+        else:
+            self._peg_lbl.configure(text="—", text_color=MUTED)
         if cur_pe < sector_pe:
             color   = GREEN
             verdict = f"▼ ниже отрасли на {sector_pe - cur_pe:.1f}x"
