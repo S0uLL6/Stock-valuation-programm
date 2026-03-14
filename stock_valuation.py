@@ -768,15 +768,19 @@ def fetch_sector_pe_live() -> dict:
 
 
 def ddm_price(d: dict) -> float:
-    """Gordon Growth Model: P = D1 / (k - g).
-    Защита: если (k-g) < 5% — модель ненадёжна, возвращаем 0."""
-    k, g, d1 = d["k"], d["g"], d["d1"]
-    if d1 <= 0:
+    """Gordon Growth Model: P = D1 / (k - g_ddm).
+    g_ddm = min(g, 20%) — ограничение роста в DDM.
+    Защита: если (k-g_ddm) < 5% — модель ненадёжна, возвращаем 0."""
+    k  = d["k"]
+    d0 = d.get("d0", 0.0)
+    if d0 <= 0:
         return 0.0
-    spread = k - g
-    if spread < 0.05:   # знаменатель слишком мал → абсурдный результат
+    g_ddm  = min(d["g"], 0.20)
+    d1_ddm = d0 * (1 + g_ddm)
+    spread = k - g_ddm
+    if spread < 0.05:
         return 0.0
-    return d1 / spread
+    return d1_ddm / spread
 
 
 def pe_price(d: dict) -> float:
