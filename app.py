@@ -382,7 +382,7 @@ class ValuationPage(ctk.CTkFrame):
 
         btn(p, "История оценок", self._show_history,
             color=CARD2, width=200).grid(
-            row=23, padx=16, pady=(4,0), sticky="ew")
+            row=23, padx=16, pady=(4,4), sticky="ew")
 
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
@@ -2612,8 +2612,8 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Stock Valuation")
-        self.geometry("1300x820")
-        self.minsize(1100, 700)
+        self.geometry("1300x860")
+        self.minsize(1100, 760)
         self.configure(fg_color=BG)
         self._build_nav()
         self._build_pages()
