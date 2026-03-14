@@ -966,12 +966,15 @@ def dcf_price(d: dict) -> float:
         return 0.0
 
     # Приоритет: реальный FCF на акцию из SmartLab
+    # SmartLab даёт финансы и акции в разных единицах (млрд / млн),
+    # поэтому используем scale = net_profit / EPS для пересчёта
     fcf_raw = d.get("fcf", 0.0)
-    shares  = d.get("shares", 0.0)
-    if fcf_raw > 0 and shares > 0:
-        fcf = fcf_raw / shares  # FCF на акцию (SmartLab даёт в млн/млрд)
-    elif fcf_raw > 0 and shares == 0:
-        fcf = fcf_raw  # уже на акцию
+    net_profit = d.get("net_profit", 0.0)
+    if fcf_raw > 0 and net_profit > 0 and eps > 0:
+        scale = net_profit / eps  # пересчёт total → per share
+        fcf = fcf_raw / scale
+    elif fcf_raw > 0 and d.get("shares", 0) > 0:
+        fcf = fcf_raw / d["shares"]  # fallback
     else:
         # Fallback: FCF = EPS × payout_ratio
         d0 = d.get("d0", 0.0)
@@ -1004,21 +1007,30 @@ def dcf_price(d: dict) -> float:
 def ev_ebitda_price(d: dict) -> float:
     """EV/EBITDA: Fair P = (EBITDA × отраслевой EV/EBITDA − Чистый долг) / Кол-во акций.
 
-    Требует: ebitda, net_debt, shares из SmartLab.
+    Требует: ebitda, net_debt из SmartLab.
+    Пересчёт в per-share через scale = net_profit / EPS.
     Не применимо для банков (EV/EBITDA = 0)."""
     ebitda   = d.get("ebitda", 0.0)
     net_debt = d.get("net_debt", 0.0)
-    shares   = d.get("shares", 0.0)
-    if ebitda <= 0 or shares <= 0:
+    eps      = d.get("eps", 0.0)
+    net_profit = d.get("net_profit", 0.0)
+    if ebitda <= 0 or eps <= 0:
         return 0.0
     mult = get_sector_ev_ebitda(d["ticker"])
     if mult <= 0:
+        return 0.0
+    # Пересчёт total → per share через scale
+    if net_profit > 0:
+        scale = net_profit / eps
+    elif d.get("shares", 0) > 0:
+        scale = d["shares"]
+    else:
         return 0.0
     ev_fair    = ebitda * mult
     equity_val = ev_fair - net_debt
     if equity_val <= 0:
         return 0.0
-    return equity_val / shares
+    return equity_val / scale
 
 
 def graham_price(d: dict) -> float:
@@ -1050,6 +1062,8 @@ def weighted_fair_price(d: dict) -> tuple:
     Веса: P/E 20%, DCF 20%, RIV 15%, DDM 15%, EV/EBITDA 15%, Graham 15%.
     DDM исключается если d0=0 (нет дивидендов).
     EV/EBITDA исключается если нет EBITDA данных.
+    Выбросы: модель исключается если её цена отличается от медианы
+    остальных более чем в 3 раза.
     Остальные веса перенормируются.
 
     Возвращает (цена: float, активные_веса: dict {модель: нормированный_вес}).
@@ -1068,6 +1082,22 @@ def weighted_fair_price(d: dict) -> tuple:
         weights["ddm"] = 0.0
     # Нормируем по доступным моделям (цена > 0 и вес > 0)
     active = {k: w for k, w in weights.items() if prices.get(k, 0) > 0 and w > 0}
+
+    # Фильтрация выбросов: исключаем модели, чья цена > 3× медианы остальных
+    if len(active) >= 3:
+        to_remove = []
+        for k in list(active):
+            others = sorted(prices[m] for m in active if m != k and prices[m] > 0)
+            if not others:
+                continue
+            median_others = others[len(others) // 2]
+            if median_others > 0:
+                ratio = prices[k] / median_others
+                if ratio > 3.0 or ratio < 1 / 3.0:
+                    to_remove.append(k)
+        for k in to_remove:
+            del active[k]
+
     total_w = sum(active.values())
     if total_w == 0:
         return 0.0, {}
