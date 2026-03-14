@@ -1016,15 +1016,11 @@ class ValuationPage(ctk.CTkFrame):
         g_vals = [round(0.03 + i * 0.025, 3) for i in range(7)]  # 3%–18%
         k_vals = [round(0.12 + i * 0.03,  3) for i in range(7)]  # 12%–33%
 
-        # Расчёт средней справедливой цены для каждой комбинации g×k
+        # Расчёт взвешенной справедливой цены для каждой комбинации g×k
         def fair(g, k):
-            dd = dict(d, g=g, k=k,
-                      d1=d["d0"] * (1 + g),
-                      pv_ri=sum((d["roe"] - k) * d["bvps"] / (1 + k) ** t
-                                for t in range(1, 6)))
-            vals = [v for v in [ddm_price(dd), pe_price(dd),
-                                riv_price(dd), dcf_price(dd)] if v > 0]
-            return sum(vals) / len(vals) if vals else 0
+            dd = dict(d, g=g, k=k, d1=d["d0"] * (1 + g))
+            avg, _ = weighted_fair_price(dd)
+            return avg
 
         matrix = [[fair(g, k) for k in k_vals] for g in g_vals]
         price  = d["price"]
@@ -1206,13 +1202,8 @@ class ValuationPage(ctk.CTkFrame):
                     upside_lbl.configure(text="")
                     continue
                 dd = dict(d, g=g_val, k=k_val,
-                          d1=d["d0"] * (1 + g_val),
-                          pv_ri=sum((d["roe"] - k_val) * d["bvps"] / (1 + k_val) ** t
-                                    for t in range(1, 6)))
-                vals = [v for v in [
-                    ddm_price(dd), pe_price(dd), riv_price(dd), dcf_price(dd)
-                ] if v > 0]
-                avg = sum(vals) / len(vals) if vals else 0
+                          d1=d["d0"] * (1 + g_val))
+                avg, _ = weighted_fair_price(dd)
                 if avg <= 0:
                     fair_lbl.configure(text="—", fg=TEXT)
                     upside_lbl.configure(text="")
