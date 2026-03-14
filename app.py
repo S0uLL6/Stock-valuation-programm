@@ -26,7 +26,7 @@ from stock_valuation import (
     get_sector_pe, get_sector_ev_ebitda, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
     calc_beta_moex,
-    fetch_cbr_key_rate, fetch_moex_market_return,
+    fetch_cbr_key_rate,
     fetch_sector_pe_live, SECTOR_PE,
     safe, _load_dotenv,
 )
@@ -40,7 +40,7 @@ except ImportError:
 
 # ── Конфиг (ставки дисконтирования) ────────────────────────────
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-_CONFIG_DEFAULTS = {"r_f": 0.16, "r_m": 0.22}
+_CONFIG_DEFAULTS = {"r_f": 0.16, "erp": 0.06, "r_m": 0.22}
 CONFIG = dict(_CONFIG_DEFAULTS)
 
 def _load_config():
@@ -51,6 +51,9 @@ def _load_config():
                 CONFIG.update(json.load(f))
         except Exception:
             pass
+    # Гарантируем r_m = r_f + erp
+    if "erp" in CONFIG:
+        CONFIG["r_m"] = CONFIG["r_f"] + CONFIG["erp"]
 
 def _save_config():
     data = {k: v for k, v in CONFIG.items()
@@ -2241,9 +2244,9 @@ class SettingsPage(ctk.CTkFrame):
             ("r_f", "Безрисковая ставка  r_f",
              "Ключевая ставка ЦБ РФ",
              "0.1600"),
-            ("r_m", "Доходность рынка  r_m",
-             "5-летний CAGR индекса MCFTR (полная доходность MOEX)",
-             "0.2200"),
+            ("erp", "Премия за риск  ERP",
+             "Equity Risk Premium (для развивающихся рынков обычно 5–8%)",
+             "0.0600"),
         ]
 
         self._entries  = {}
@@ -2269,6 +2272,21 @@ class SettingsPage(ctk.CTkFrame):
             sl.grid(row=ri*3, column=2, rowspan=2,
                     padx=(0, 20), pady=16, sticky="w")
             self._src_lbls[key] = sl
+
+        # Вычисляемая r_m = r_f + ERP (не редактируемая)
+        r_row = len(fields_cfg)
+        Div(card).grid(row=r_row*3 - 1, column=0, columnspan=3,
+                       padx=20, pady=0, sticky="ew")
+        lbl(card, "Ожидаемая доходность рынка  r_m", size=13,
+            weight="bold").grid(
+            row=r_row*3, column=0, padx=(20, 40), pady=(20, 2), sticky="w")
+        lbl(card, "r_m = r_f + ERP  (используется в CAPM)",
+            size=11, color=MUTED).grid(
+            row=r_row*3+1, column=0, padx=(20, 40), pady=(0, 16), sticky="w")
+        self._rm_lbl = lbl(card, f"{CONFIG['r_m']*100:.2f}%", size=14,
+                           weight="bold", color=GREEN)
+        self._rm_lbl.grid(row=r_row*3, column=1, rowspan=2,
+                          padx=(0, 12), pady=16, sticky="w")
 
         # ── Кнопки ─────────────────────────────────────────────
         row_btn = ctk.CTkFrame(wrap, fg_color="transparent")
@@ -2331,20 +2349,15 @@ class SettingsPage(ctk.CTkFrame):
         self._pe_status.pack(side="left", padx=(12, 0))
 
     def _auto_fetch(self):
-        """Подтягивает ставки из интернета в фоне."""
+        """Подтягивает r_f из ЦБ РФ, r_m вычисляется как r_f + ERP."""
         self._auto_btn.configure(state="disabled", text="Загружаю…")
         self._status_lbl.configure(text="", text_color=MUTED)
 
         def worker():
             results = {}
-            # 1. ЦБ РФ ключевая ставка
             date_s, r_f = fetch_cbr_key_rate()
             if r_f is not None:
                 results["r_f"] = (r_f, f"ЦБ РФ от {date_s}")
-            # 2. MOEX историческая доходность (5 лет)
-            cagr, desc = fetch_moex_market_return(years=5)
-            if cagr is not None:
-                results["r_m"] = (cagr, desc)
             self.after(0, lambda: self._fill_auto(results))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -2360,6 +2373,8 @@ class SettingsPage(ctk.CTkFrame):
             e.delete(0, "end")
             e.insert(0, f"{val:.4f}")
             self._src_lbls[key].configure(text=src, text_color=GREEN)
+        # Обновляем r_m preview
+        self._update_rm_preview()
         loaded = ", ".join(
             f"{k}={v*100:.2f}%" for k, (v, _) in results.items())
         self._status_lbl.configure(
@@ -2369,26 +2384,38 @@ class SettingsPage(ctk.CTkFrame):
     def _apply(self):
         try:
             r_f = float(self._entries["r_f"].get().strip())
-            r_m = float(self._entries["r_m"].get().strip())
+            erp = float(self._entries["erp"].get().strip())
         except ValueError:
             self._status_lbl.configure(
                 text="Ошибка: введи числа (например 0.16)", text_color=RED)
             return
         if not (0 < r_f < 1):
             self._status_lbl.configure(
-                text="r_f должна быть от 0 до 1 (ставка ЦБ не бывает отрицательной)", text_color=RED)
+                text="r_f должна быть от 0 до 1", text_color=RED)
             return
-        if not (-1 < r_m < 10):
+        if not (0 < erp < 1):
             self._status_lbl.configure(
-                text="r_m вне разумного диапазона (от -100% до +1000%)", text_color=RED)
+                text="ERP должна быть от 0 до 1 (обычно 0.05–0.08)", text_color=RED)
             return
+        r_m = r_f + erp
         CONFIG["r_f"] = r_f
+        CONFIG["erp"] = erp
         CONFIG["r_m"] = r_m
         _save_config()
+        self._rm_lbl.configure(text=f"{r_m*100:.2f}%")
         self._status_lbl.configure(
-            text=f"✓ Сохранено: r_f={r_f*100:.2f}%  r_m={r_m*100:.2f}%",
+            text=f"✓ Сохранено: r_f={r_f*100:.2f}%  ERP={erp*100:.1f}%  →  r_m={r_m*100:.2f}%",
             text_color=GREEN)
         self.app._refresh_rates_label()
+
+    def _update_rm_preview(self):
+        """Обновляет отображение r_m из текущих полей."""
+        try:
+            r_f = float(self._entries["r_f"].get().strip())
+            erp = float(self._entries["erp"].get().strip())
+            self._rm_lbl.configure(text=f"{(r_f + erp)*100:.2f}%")
+        except (ValueError, TypeError):
+            pass
 
     def _reset(self):
         CONFIG.update(_CONFIG_DEFAULTS)
@@ -2396,8 +2423,10 @@ class SettingsPage(ctk.CTkFrame):
         for key, e in self._entries.items():
             e.delete(0, "end")
             e.insert(0, str(_CONFIG_DEFAULTS[key]))
+        self._rm_lbl.configure(text=f"{_CONFIG_DEFAULTS['r_m']*100:.2f}%")
         self._status_lbl.configure(
             text=f"↩ Сброшено: r_f={_CONFIG_DEFAULTS['r_f']*100:.0f}%  "
+                 f"ERP={_CONFIG_DEFAULTS['erp']*100:.0f}%  "
                  f"r_m={_CONFIG_DEFAULTS['r_m']*100:.0f}%",
             text_color=MUTED)
         self.app._refresh_rates_label()
@@ -2714,7 +2743,7 @@ class App(ctk.CTk):
         rates_frame.pack(side="right", padx=16, pady=8)
         self._rates_lbl = lbl(
             rates_frame,
-            f"r_f {CONFIG['r_f']*100:.1f}%   r_m {CONFIG['r_m']*100:.1f}%",
+            f"r_f {CONFIG['r_f']*100:.1f}%  ERP {CONFIG.get('erp',0.06)*100:.0f}%  r_m {CONFIG['r_m']*100:.1f}%",
             size=12, color=MUTED)
         self._rates_lbl.pack(padx=12, pady=4)
 
@@ -2759,7 +2788,7 @@ class App(ctk.CTk):
 
     def _refresh_rates_label(self):
         self._rates_lbl.configure(
-            text=f"r_f {CONFIG['r_f']*100:.1f}%   r_m {CONFIG['r_m']*100:.1f}%")
+            text=f"r_f {CONFIG['r_f']*100:.1f}%  ERP {CONFIG.get('erp',0.06)*100:.0f}%  r_m {CONFIG['r_m']*100:.1f}%")
 
 
 if __name__ == "__main__":
