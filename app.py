@@ -362,16 +362,20 @@ class ValuationPage(ctk.CTkFrame):
             color=CARD2, width=200).grid(
             row=22, padx=16, pady=(4,0), sticky="ew")
 
+        btn(p, "История оценок", self._show_history,
+            color=CARD2, width=200).grid(
+            row=23, padx=16, pady=(4,0), sticky="ew")
+
         btn(p, "Экспорт Excel", self._export_excel,
             color=CARD2, width=200).grid(
-            row=23, padx=16, pady=(8,2), sticky="ew")
+            row=24, padx=16, pady=(8,2), sticky="ew")
 
         btn(p, "Экспорт CSV", self._export_csv,
             color=CARD2, width=200).grid(
-            row=24, padx=16, pady=(2,4), sticky="ew")
+            row=25, padx=16, pady=(2,4), sticky="ew")
 
         self.status_lbl = lbl(p, "", size=11, color=MUTED)
-        self.status_lbl.grid(row=25, padx=16, pady=(4,12), sticky="w")
+        self.status_lbl.grid(row=26, padx=16, pady=(4,12), sticky="w")
 
     # ── Карточки результатов ───────────────────────────────────
     def _build_results(self):
@@ -1160,6 +1164,97 @@ class ValuationPage(ctk.CTkFrame):
 
         # Сразу считаем при открытии
         _calc_scenarios()
+
+    def _show_history(self):
+        ticker = self.ticker_e.get().strip().upper().replace(".ME", "")
+        history = _load_history()
+        if ticker:
+            entries = [e for e in history if e.get("ticker") == ticker]
+        else:
+            entries = history
+        entries = entries[-50:]  # last 50
+
+        win = tk.Toplevel(self)
+        win.title(f"История оценок{' — ' + ticker if ticker else ''}")
+        win.configure(bg=CARD)
+        win.geometry("680x620")
+
+        tk.Label(win, text=f"История оценок{' — ' + ticker if ticker else ''}",
+                 bg=CARD, fg=TEXT, font=("SF Pro Display", 14, "bold")).pack(
+                 padx=20, pady=(16, 4))
+
+        if not entries:
+            tk.Label(win, text="Нет сохранённых расчётов",
+                     bg=CARD, fg=MUTED, font=("SF Pro Display", 12)).pack(pady=40)
+            return
+
+        # Treeview с историей
+        import tkinter.ttk as ttk
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("History.Treeview",
+                        background=CARD2, foreground=TEXT,
+                        fieldbackground=CARD2, borderwidth=0,
+                        rowheight=22, font=("SF Pro Mono", 11))
+        style.configure("History.Treeview.Heading",
+                        background=CARD, foreground=MUTED,
+                        font=("SF Pro Display", 10, "bold"))
+
+        cols = ("date", "ticker", "price", "ddm", "pe", "riv", "dcf", "avg")
+        heads = ("Дата", "Тикер", "Цена", "DDM", "P/E", "RIV", "DCF", "Справедл.")
+        tree_frame = tk.Frame(win, bg=CARD)
+        tree_frame.pack(fill="both", expand=True, padx=16, pady=(4, 0))
+
+        tree = ttk.Treeview(tree_frame, columns=cols, show="headings",
+                            style="History.Treeview", height=12)
+        widths = (80, 60, 70, 70, 70, 70, 70, 80)
+        for col, head, w in zip(cols, heads, widths):
+            tree.heading(col, text=head)
+            tree.column(col, width=w, anchor="center")
+
+        sb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=sb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+
+        for e in reversed(entries):
+            tree.insert("", "end", values=(
+                e.get("date", ""),
+                e.get("ticker", ""),
+                f"{e.get('price', 0):.1f}",
+                f"{e.get('ddm', 0):.1f}" if e.get("ddm", 0) > 0 else "—",
+                f"{e.get('pe', 0):.1f}"  if e.get("pe",  0) > 0 else "—",
+                f"{e.get('riv', 0):.1f}" if e.get("riv", 0) > 0 else "—",
+                f"{e.get('dcf', 0):.1f}" if e.get("dcf", 0) > 0 else "—",
+                f"{e.get('avg', 0):.1f}" if e.get("avg", 0) > 0 else "—",
+            ))
+
+        # Mini-chart if we have a specific ticker with data
+        if ticker and len(entries) >= 2:
+            fig = Figure(figsize=(6, 2.2), dpi=90)
+            fig.patch.set_facecolor(CARD)
+            ax = fig.add_subplot(111)
+            ax.set_facecolor(CARD2)
+
+            dates_h = [e.get("date", "") for e in entries]
+            avgs_h  = [e.get("avg", 0)   for e in entries]
+            prices_h= [e.get("price", 0) for e in entries]
+
+            ax.plot(dates_h, avgs_h,   color=GREEN,  linewidth=2,
+                    label="Справедл.", marker="o", markersize=4)
+            ax.plot(dates_h, prices_h, color=ACCENT, linewidth=2,
+                    label="Рыночная", marker="o", markersize=4, linestyle="--")
+            ax.legend(fontsize=8, facecolor=CARD, edgecolor=BORDER,
+                      labelcolor=TEXT)
+            ax.tick_params(colors=MUTED, labelsize=7)
+            ax.spines[:].set_color(BORDER)
+            for label in ax.get_xticklabels():
+                label.set_rotation(30)
+                label.set_ha("right")
+
+            canvas = FigureCanvasTkAgg(fig, master=win)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill="x", padx=16, pady=(4, 12))
 
     def _add_to_portfolio(self):
         if not self.data:
