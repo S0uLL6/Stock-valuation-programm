@@ -21,8 +21,9 @@ from matplotlib.figure import Figure
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import stock_valuation as sv
 from stock_valuation import (
-    ddm_price, pe_price, riv_price, dcf_price, weighted_fair_price,
-    get_sector_pe, update_summary_sheet,
+    ddm_price, pe_price, riv_price, dcf_price,
+    ev_ebitda_price, graham_price, weighted_fair_price,
+    get_sector_pe, get_sector_ev_ebitda, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
     fetch_cbr_key_rate, fetch_moex_market_return,
     fetch_sector_pe_live, SECTOR_PE,
@@ -198,12 +199,28 @@ MODEL_INFO = {
             "Учитывает создание стоимости\n"
             "сверх требуемой доходности."),
     "dcf": ("DCF — Дисконтированные потоки",
-            "P = Σ EPS×(1+g)ᵗ/(1+k)ᵗ + TV/(1+k)ᵀ\n\n"
+            "P = Σ FCF×(1+g)ᵗ/(1+k)ᵗ + TV/(1+k)ᵀ\n\n"
+            "FCF — свободный денежный поток\n"
             "T  — горизонт прогноза (7 лет)\n"
             "TV — терминальная стоимость\n"
             "g_term = min(g, 4%)\n\n"
-            "Наиболее полная модель: учитывает\n"
-            "рост прибыли и долгосрочную стоимость."),
+            "Использует реальный FCF если доступен,\n"
+            "иначе EPS × payout_ratio."),
+    "ev_ebitda": ("EV/EBITDA — Мультипликатор",
+            "P = (EBITDA × EV/EBITDA_отрасли − ЧД) / N\n\n"
+            "EBITDA — прибыль до вычетов\n"
+            "ЧД     — чистый долг\n"
+            "N      — кол-во акций\n\n"
+            "Самый важный мультипликатор для\n"
+            "капиталоёмких секторов (нефть, металлы)."),
+    "graham": ("Формула Грэма",
+            "V = EPS × (8.5 + 2g) × 4.4 / r_f\n\n"
+            "8.5 — P/E для компании без роста\n"
+            "g   — ожидаемый рост (%, до 20%)\n"
+            "r_f — безрисковая ставка (%)\n"
+            "4.4 — историческая доходность AAA\n\n"
+            "Классическая формула стоимостного\n"
+            "инвестирования Бенджамина Грэма."),
 }
 
 class TooltipWindow(tk.Toplevel):
@@ -403,40 +420,40 @@ class ValuationPage(ctk.CTkFrame):
     def _build_results(self):
         f = ctk.CTkFrame(self, fg_color="transparent")
         f.grid(row=0, column=1, padx=(8,16), pady=(16,8), sticky="ew")
-        f.grid_columnconfigure((0,1,2,3,4), weight=1)
+        for c in range(7):
+            f.grid_columnconfigure(c, weight=1)
 
         self.model_cards = {}
         models = [
-            ("ddm", "DDM",  "Gordon Growth Model", ACCENT),
-            ("pe",  "P/E",  "Отраслевой метод",    PURPLE),
-            ("riv", "RIV",  "Остаточный доход",    GOLD),
-            ("dcf", "DCF",  "Дисконт. потоки",     "#79C0FF"),
+            ("ddm",       "DDM",       "Gordon Model",   ACCENT),
+            ("pe",        "P/E",       "Отраслевой",     PURPLE),
+            ("riv",       "RIV",       "Остат. доход",   GOLD),
+            ("dcf",       "DCF",       "Дисконт. FCF",   "#79C0FF"),
+            ("ev_ebitda", "EV/EBITDA", "Мультипликатор",  "#F97583"),
+            ("graham",    "Graham",    "Формула Грэма",  "#56D364"),
         ]
         for col, (key, name, sub, color) in enumerate(models):
             card = Card(f)
-            card.grid(row=0, column=col, padx=4, sticky="nsew")
+            card.grid(row=0, column=col, padx=3, sticky="nsew")
             card.grid_columnconfigure(0, weight=1)
             card.configure(cursor="hand2")
 
-            lbl(card, name, size=13, weight="bold", color=color).grid(
-                row=0, padx=14, pady=(12,0), sticky="w")
-            lbl(card, sub, size=10, color=MUTED).grid(
-                row=1, padx=14, pady=(0,4), sticky="w")
-            vl = lbl(card, "—", size=22, weight="bold", color=TEXT)
-            vl.grid(row=2, padx=14, pady=(0,12), sticky="w")
+            lbl(card, name, size=12, weight="bold", color=color).grid(
+                row=0, padx=10, pady=(10,0), sticky="w")
+            lbl(card, sub, size=9, color=MUTED).grid(
+                row=1, padx=10, pady=(0,2), sticky="w")
+            vl = lbl(card, "—", size=18, weight="bold", color=TEXT)
+            vl.grid(row=2, padx=10, pady=(0,8), sticky="w")
 
-            # Клик — показываем формулу
             for widget in (card, vl):
                 widget.bind("<Button-1>",
                     lambda e, k=key: self._show_model_info(k))
-            lbl(card, "нажми для формулы", size=9,
-                color=MUTED).grid(row=3, padx=14, pady=(0,10), sticky="w")
 
             self.model_cards[key] = vl
 
         # P/E мини-карточка (row=1, span all columns)
         pe_card = Card(f)
-        pe_card.grid(row=1, column=0, columnspan=5, padx=4, pady=(6,0), sticky="ew")
+        pe_card.grid(row=1, column=0, columnspan=7, padx=3, pady=(6,0), sticky="ew")
         pe_card.grid_columnconfigure((0,1,2,3), weight=1)
         lbl(pe_card, "P/E текущий", size=11, color=MUTED).grid(
             row=0, column=0, padx=14, pady=(8,2), sticky="w")
@@ -453,7 +470,7 @@ class ValuationPage(ctk.CTkFrame):
 
         # Итог
         self.fair_card = Card(f)
-        self.fair_card.grid(row=0, column=4, padx=(8,0), sticky="nsew")
+        self.fair_card.grid(row=0, column=6, padx=(6,0), sticky="nsew")
         self.fair_card.grid_columnconfigure(0, weight=1)
 
         lbl(self.fair_card, "Справедливая цена", size=13,
@@ -909,10 +926,12 @@ class ValuationPage(ctk.CTkFrame):
 
         ddm = ddm_price(d); cmp = pe_price(d)
         riv = riv_price(d); dcf = dcf_price(d)
+        eveb = ev_ebitda_price(d); grh = graham_price(d)
         avg, active_weights = weighted_fair_price(d)
         upside = (avg/price - 1)*100 if price and avg else 0
 
-        for key, val in [("ddm",ddm),("pe",cmp),("riv",riv),("dcf",dcf)]:
+        for key, val in [("ddm",ddm),("pe",cmp),("riv",riv),("dcf",dcf),
+                         ("ev_ebitda",eveb),("graham",grh)]:
             self.model_cards[key].configure(
                 text=f"{val:.2f} ₽" if val > 0 else "—")
 
@@ -933,6 +952,7 @@ class ValuationPage(ctk.CTkFrame):
         cur_pe     = price / eps if eps > 0 else 0
         sector_pe  = get_sector_pe(ticker)
         self.data = {**d, "ddm":ddm,"cmp":cmp,"riv":riv,"dcf":dcf,
+                     "ev_ebitda":eveb,"graham":grh,
                      "avg":avg,"upside":upside,
                      "cur_pe": cur_pe, "sector_pe": sector_pe}
         _save_history_entry({
@@ -943,6 +963,8 @@ class ValuationPage(ctk.CTkFrame):
             "pe":     round(cmp, 2),
             "riv":    round(riv, 2),
             "dcf":    round(dcf, 2),
+            "ev_ebitda": round(eveb, 2),
+            "graham": round(grh, 2),
             "avg":    round(avg, 2),
         })
         self._update_pe_card(cur_pe, sector_pe)
@@ -2550,13 +2572,16 @@ class ScreeningPage(ctk.CTkFrame):
             pv_ri = sum((roe - r_avg) * bvps / (1 + r_avg) ** t
                         for t in range(1, 6)) if r_avg else 0
 
+            sl_extra = {k: sl[k] for k in
+                ("ebitda","net_debt","fcf","de_ratio","shares","revenue","net_profit")
+                if k in sl}
             d = dict(ticker=ticker, name=name, price=price,
                      d0=d0, d1=d1, g=g, k=r_avg,
                      eps=eps, pe=(price / eps if eps > 0 else 0),
                      bvps=bvps, pv_ri=pv_ri, roe=roe,
                      beta=beta, r_f=r_f, r_m=r_m,
                      r_capm=r_capm, r_ddm=r_ddm, r_avg=r_avg,
-                     currency="₽")
+                     currency="₽", **sl_extra)
             fair, _ = weighted_fair_price(d)
             upside = (fair / price - 1) * 100 if price and fair else 0
             result = dict(ticker=ticker, name=name or ticker,

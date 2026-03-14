@@ -738,6 +738,21 @@ SECTOR_REPS = {
     "Девелопмент":       ["SMLT"],
 }
 
+# Отраслевые EV/EBITDA для российского рынка — базовые значения (fallback)
+SECTOR_EV_EBITDA = {
+    "Нефть и газ":       3.5,
+    "Банки":             0.0,   # не применимо для банков
+    "Металлы":           4.5,
+    "Ритейл":            6.0,
+    "Телеком":           4.0,
+    "Технологии":       10.0,
+    "Электроэнергетика": 3.5,
+    "Удобрения":         5.0,
+    "Транспорт":         5.0,
+    "Девелопмент":       5.5,
+    "default":           5.0,
+}
+
 # Живые P/E: обновляются из фонового потока (app.py → _refresh_sector_pe)
 _LIVE_SECTOR_PE: dict = {}
 
@@ -749,6 +764,12 @@ def get_sector_pe(ticker: str) -> float:
     if live and live > 0:
         return live
     return SECTOR_PE.get(sector, SECTOR_PE["default"])
+
+
+def get_sector_ev_ebitda(ticker: str) -> float:
+    """Возвращает отраслевой EV/EBITDA."""
+    sector = TICKER_SECTOR.get(ticker.upper(), "default")
+    return SECTOR_EV_EBITDA.get(sector, SECTOR_EV_EBITDA["default"])
 
 
 def fetch_sector_pe_live() -> dict:
@@ -899,27 +920,69 @@ def dcf_price(d: dict) -> float:
     return pv_fcf + pv_tv
 
 
-# Веса моделей: P/E 30%, DCF 25%, RIV 25%, DDM 20%
-_MODEL_WEIGHTS = {"pe": 0.30, "dcf": 0.25, "riv": 0.25, "ddm": 0.20}
+def ev_ebitda_price(d: dict) -> float:
+    """EV/EBITDA: Fair P = (EBITDA × отраслевой EV/EBITDA − Чистый долг) / Кол-во акций.
+
+    Требует: ebitda, net_debt, shares из SmartLab.
+    Не применимо для банков (EV/EBITDA = 0)."""
+    ebitda   = d.get("ebitda", 0.0)
+    net_debt = d.get("net_debt", 0.0)
+    shares   = d.get("shares", 0.0)
+    if ebitda <= 0 or shares <= 0:
+        return 0.0
+    mult = get_sector_ev_ebitda(d["ticker"])
+    if mult <= 0:
+        return 0.0
+    ev_fair    = ebitda * mult
+    equity_val = ev_fair - net_debt
+    if equity_val <= 0:
+        return 0.0
+    return equity_val / shares
+
+
+def graham_price(d: dict) -> float:
+    """Формула Грэма: V = EPS × (8.5 + 2g×100) × 4.4 / (r_f×100).
+
+    Классическая формула Бенджамина Грэма для оценки роста.
+    8.5 — базовый P/E для компании без роста.
+    4.4 — средняя доходность AAA-облигаций (историческая)."""
+    eps = d["eps"]
+    g   = d.get("g", 0.08)
+    r_f = d.get("r_f", 0.16)
+    if eps <= 0 or r_f <= 0:
+        return 0.0
+    g_pct  = min(g, 0.20) * 100    # ограничиваем g до 20%
+    rf_pct = r_f * 100
+    return eps * (8.5 + 2 * g_pct) * 4.4 / rf_pct
+
+
+# Веса моделей: P/E, DCF, RIV, DDM, EV/EBITDA, Graham
+_MODEL_WEIGHTS = {
+    "pe": 0.20, "dcf": 0.20, "riv": 0.15, "ddm": 0.15,
+    "ev_ebitda": 0.15, "graham": 0.15,
+}
 
 
 def weighted_fair_price(d: dict) -> tuple:
-    """Взвешенная агрегация справедливой цены.
+    """Взвешенная агрегация справедливой цены (6 моделей).
 
-    Весовая схема: P/E 30%, DCF 25%, RIV 25%, DDM 20%.
-    DDM исключается (вес=0) если d0=0 — нет дивидендов.
+    Веса: P/E 20%, DCF 20%, RIV 15%, DDM 15%, EV/EBITDA 15%, Graham 15%.
+    DDM исключается если d0=0 (нет дивидендов).
+    EV/EBITDA исключается если нет EBITDA данных.
     Остальные веса перенормируются.
 
     Возвращает (цена: float, активные_веса: dict {модель: нормированный_вес}).
     """
     prices = {
-        "pe":  pe_price(d),
-        "dcf": dcf_price(d),
-        "riv": riv_price(d),
-        "ddm": ddm_price(d),
+        "pe":        pe_price(d),
+        "dcf":       dcf_price(d),
+        "riv":       riv_price(d),
+        "ddm":       ddm_price(d),
+        "ev_ebitda": ev_ebitda_price(d),
+        "graham":    graham_price(d),
     }
     weights = dict(_MODEL_WEIGHTS)
-    # 18.2: DDM исключается если нет дивидендов
+    # DDM исключается если нет дивидендов
     if d.get("d0", 0) <= 0:
         weights["ddm"] = 0.0
     # Нормируем по доступным моделям (цена > 0 и вес > 0)
