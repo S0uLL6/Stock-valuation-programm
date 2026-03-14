@@ -25,6 +25,7 @@ from stock_valuation import (
     ev_ebitda_price, graham_price, weighted_fair_price,
     get_sector_pe, get_sector_ev_ebitda, update_summary_sheet,
     moex_dividends, moex_price, moex_name, fetch_smartlab,
+    calc_beta_moex,
     fetch_cbr_key_rate, fetch_moex_market_return,
     fetch_sector_pe_live, SECTOR_PE,
     safe, _load_dotenv,
@@ -792,6 +793,7 @@ class ValuationPage(ctk.CTkFrame):
                     price = moex_price(tick)
                     name  = moex_name(tick)
                     sl    = fetch_smartlab(tick)
+                    beta  = calc_beta_moex(tick)
                     divs  = moex_dividends(tick)
                     if divs:
                         cutoff = datetime.now().replace(
@@ -801,7 +803,8 @@ class ValuationPage(ctk.CTkFrame):
                     else:
                         d0 = 0.0
                     self.after(0, lambda: self._fill({
-                        "price":price,"name":name,"d0":d0,**sl}))
+                        "price":price,"name":name,"d0":d0,
+                        "beta":beta, **sl}))
                 else:
                     import yfinance as yf
                     t = yf.Ticker(ticker)
@@ -2583,7 +2586,7 @@ class ScreeningPage(ctk.CTkFrame):
             bvps = sl.get("bvps", 0) or 0
             roe  = sl.get("roe", 0.15) or 0.15
             g    = sl.get("g", 0.08) or 0.08
-            beta = sl.get("beta", 1.0) or 1.0
+            beta = calc_beta_moex(ticker)
             r_capm = r_f + beta * (r_m - r_f)
             d1 = d0 * (1 + g)
             r_ddm = (d1 / price + g) if price and d1 else r_capm
