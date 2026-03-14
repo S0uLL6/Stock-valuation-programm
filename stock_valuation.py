@@ -793,8 +793,10 @@ def pe_price(d: dict) -> float:
 
 
 def riv_price(d: dict) -> float:
-    """Residual Income Valuation: P = BVPS + Σ PV(RI_t).
-    RI_t = (ROE − k) × BVPS × (1+g_riv)^t, g_riv = min(g, 20%)."""
+    """Residual Income Valuation: P = BVPS + Σ PV(RI_t) + PV(TV).
+    RI_t = (ROE − k) × BVPS × (1+g_riv)^t, g_riv = min(g, 20%).
+    TV = RI_T / k (перпетуитет), PV(TV) = TV / (1+k)^T.
+    TV = 0 если RI_T ≤ 0 (защита от отрицательной TV)."""
     bvps = d["bvps"]
     roe  = d.get("roe", 0.0)
     k    = d["k"]
@@ -805,7 +807,10 @@ def riv_price(d: dict) -> float:
     T     = 5
     ri_0  = (roe - k) * bvps
     pv_ri = sum(ri_0 * (1 + g_riv)**t / (1 + k)**t for t in range(1, T + 1))
-    return bvps + pv_ri
+    # Terminal Value: perpetuity of residual income at T
+    ri_T  = ri_0 * (1 + g_riv)**T
+    pv_tv = (ri_T / k) / (1 + k)**T if ri_T > 0 else 0.0
+    return bvps + pv_ri + pv_tv
 
 
 def dcf_price(d: dict) -> float:
