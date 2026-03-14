@@ -931,7 +931,17 @@ class ValuationPage(ctk.CTkFrame):
         d1     = d0 * (1 + g)
         r_ddm  = (d1/price + g) if price and d1 else r_capm
         r_ddm  = max(min(r_ddm, 0.60), r_f)
-        r_avg  = (r_capm + r_ddm) / 2
+
+        # WACC если есть D/E данные, иначе (CAPM+DDM)/2
+        de = self._sl_extra.get("de_ratio", 0.0)
+        if de > 0:
+            tax = 0.20  # ставка налога на прибыль РФ
+            r_debt = r_f + 0.02  # приблизительная стоимость долга
+            e_share = 1 / (1 + de)
+            d_share = de / (1 + de)
+            r_avg = e_share * r_capm + d_share * r_debt * (1 - tax)
+        else:
+            r_avg = (r_capm + r_ddm) / 2
         ri     = (roe - r_avg) * bvps
         pv_ri  = sum(ri/(1+r_avg)**t for t in range(1,6)) if r_avg else 0
 
@@ -987,11 +997,11 @@ class ValuationPage(ctk.CTkFrame):
             "avg":    round(avg, 2),
         })
         self._update_pe_card(cur_pe, sector_pe)
-        if g > 0.20:
-            self._status(
-                f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%  ⚠ g обрезано до 20%", GOLD)
-        else:
-            self._status(f"✓ k={r_avg*100:.1f}%  CAPM={r_capm*100:.1f}%", GREEN)
+        k_type = "WACC" if de > 0 else "avg"
+        g_warn = "  ⚠ g→20%" if g > 0.20 else ""
+        self._status(
+            f"✓ k={r_avg*100:.1f}% ({k_type})  CAPM={r_capm*100:.1f}%{g_warn}",
+            GOLD if g > 0.20 else GREEN)
 
     def _show_sensitivity(self):
         if not self.data:
@@ -2587,7 +2597,15 @@ class ScreeningPage(ctk.CTkFrame):
             d1 = d0 * (1 + g)
             r_ddm = (d1 / price + g) if price and d1 else r_capm
             r_ddm = max(min(r_ddm, 0.60), r_f)
-            r_avg = (r_capm + r_ddm) / 2
+            de = sl.get("de_ratio", 0.0) or 0.0
+            if de > 0:
+                tax = 0.20
+                r_debt = r_f + 0.02
+                e_share = 1 / (1 + de)
+                d_share = de / (1 + de)
+                r_avg = e_share * r_capm + d_share * r_debt * (1 - tax)
+            else:
+                r_avg = (r_capm + r_ddm) / 2
             pv_ri = sum((roe - r_avg) * bvps / (1 + r_avg) ** t
                         for t in range(1, 6)) if r_avg else 0
 
