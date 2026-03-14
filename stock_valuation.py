@@ -289,6 +289,17 @@ def fetch_smartlab(ticker: str, verbose: bool = True) -> dict:
     if roe > 1:      # smart-lab отдаёт в процентах (24.5, а не 0.245)
         roe /= 100
 
+    # Дополнительные данные: выручка, EBITDA, чистый долг, FCF, D/E, кол-во акций
+    revenue   = last_val([r'Выручка', r'Revenue'])
+    ebitda    = last_val([r'\bEBITDA\b'])
+    net_debt  = last_val([r'Чистый долг', r'Net Debt'])
+    fcf       = last_val([r'\bFCF\b', r'Free Cash Flow', r'Свободный денежный поток'])
+    de_ratio  = last_val([r'Долг/Капитал', r'D/E', r'Debt.*Equity'])
+    if de_ratio > 10:   # smart-lab может давать в процентах
+        de_ratio /= 100
+    shares    = last_val([r'Кол.*акций', r'Shares', r'Число акций'])
+    net_profit = last_val([r'Чистая прибыль', r'Net Profit', r'Net Income'])
+
     # Рост дивидендов g — считаем из истории дивидендов на странице
     g = 0.08
     div_vals = []
@@ -313,9 +324,32 @@ def fetch_smartlab(ticker: str, verbose: bool = True) -> dict:
             print("  ⚠ Данные с smart-lab не распознаны (возможно сайт изменил структуру)")
         return {}
 
+    result = {"eps": eps, "bvps": bvps, "roe": roe, "g": g}
+    if revenue > 0:
+        result["revenue"] = revenue
+    if ebitda > 0:
+        result["ebitda"] = ebitda
+    if net_debt != 0:
+        result["net_debt"] = net_debt
+    if fcf != 0:
+        result["fcf"] = fcf
+    if de_ratio > 0:
+        result["de_ratio"] = de_ratio
+    if shares > 0:
+        result["shares"] = shares
+    if net_profit != 0:
+        result["net_profit"] = net_profit
+
     if verbose:
-        print(f"  ✅ Smart-lab: EPS={eps:.2f}₽  BVPS={bvps:.2f}₽  ROE={roe*100:.1f}%  g≈{g*100:.1f}%")
-    return {"eps": eps, "bvps": bvps, "roe": roe, "g": g}
+        extra = ""
+        if ebitda > 0:
+            extra += f"  EBITDA={ebitda:.0f}"
+        if net_debt != 0:
+            extra += f"  ЧД={net_debt:.0f}"
+        if fcf != 0:
+            extra += f"  FCF={fcf:.0f}"
+        print(f"  ✅ Smart-lab: EPS={eps:.2f}₽  BVPS={bvps:.2f}₽  ROE={roe*100:.1f}%  g≈{g*100:.1f}%{extra}")
+    return result
 
 # ────────────────────────────────────────────────────────────────
 #  Авто-получение ставок из открытых источников
