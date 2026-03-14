@@ -79,6 +79,27 @@ def _load_portfolio() -> dict:
             pass
     return {}
 
+# ── История оценок (history.json) ───────────────────────────────
+_HISTORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history.json")
+
+def _load_history() -> list:
+    if os.path.exists(_HISTORY_PATH):
+        try:
+            with open(_HISTORY_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _save_history_entry(entry: dict):
+    history = _load_history()
+    history.append(entry)
+    try:
+        with open(_HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠ Ошибка сохранения истории: {e}")
+
 # ── Цвета ──────────────────────────────────────────────────────
 BG      = "#0D1117"
 CARD    = "#161B22"
@@ -883,6 +904,16 @@ class ValuationPage(ctk.CTkFrame):
         self.data = {**d, "ddm":ddm,"cmp":cmp,"riv":riv,"dcf":dcf,
                      "avg":avg,"upside":upside,
                      "cur_pe": cur_pe, "sector_pe": sector_pe}
+        _save_history_entry({
+            "ticker": ticker,
+            "date":   datetime.now().strftime("%Y-%m-%d"),
+            "price":  round(price, 2),
+            "ddm":    round(ddm, 2),
+            "pe":     round(cmp, 2),
+            "riv":    round(riv, 2),
+            "dcf":    round(dcf, 2),
+            "avg":    round(avg, 2),
+        })
         self._update_pe_card(cur_pe, sector_pe)
         if g > 0.20:
             self._status(
