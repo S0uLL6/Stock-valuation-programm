@@ -1033,6 +1033,7 @@ def update_summary_sheet(wb, d: dict):
     # ── Обновляем текущий тикер ───────────────────────────────────
     ddm, cmp, riv = ddm_price(d), pe_price(d), riv_price(d)
     dcf = dcf_price(d)
+    eveb, grh = ev_ebitda_price(d), graham_price(d)
     avg, _ = weighted_fair_price(d)
     upside = round((avg / d["price"] - 1) * 100, 1) if d["price"] and avg else 0
 
@@ -1045,7 +1046,9 @@ def update_summary_sheet(wb, d: dict):
         round(cmp,               2),   # P/E отраслевой
         round(riv,               2),   # RIV
         round(dcf,               2),   # DCF
-        round(avg,               2),   # Среднее (справедливая цена)
+        round(eveb,              2),   # EV/EBITDA
+        round(grh,               2),   # Graham
+        round(avg,               2),   # Справедливая (взвешенная)
         upside,                        # Потенциал %
         round(d["eps"],          2),   # EPS
         round(d["price"] / d["eps"] if d["eps"] > 0 else 0, 1),  # Текущий P/E
@@ -1067,10 +1070,12 @@ def update_summary_sheet(wb, d: dict):
         ("Компания",    28),
         ("Вал.",        5),
         ("Цена",        10),
-        ("DDM",         11),
-        ("P/E отрасль", 11),
-        ("RIV",         11),
-        ("DCF",         11),
+        ("DDM",         10),
+        ("P/E",         10),
+        ("RIV",         10),
+        ("DCF",         10),
+        ("EV/EBITDA",   10),
+        ("Graham",      10),
         ("Справедл.",   11),
         ("Потенц.%",    10),
         ("EPS",          8),
@@ -1109,15 +1114,17 @@ def update_summary_sheet(wb, d: dict):
     ws.row_dimensions[2].height = 22
 
     # Строки данных — сортировка по потенциалу (убывание)
+    # upside_idx = index of "Потенц.%" in row (0-based) = 11
+    upside_idx = 11
+    fair_idx   = 10  # "Справедл." column (0-based)
     sorted_rows = sorted(
         existing.values(),
-        key=lambda r: r[8] if isinstance(r[8], (int, float)) else -999,
+        key=lambda r: r[upside_idx] if len(r) > upside_idx and isinstance(r[upside_idx], (int, float)) else -999,
         reverse=True
     )
 
     for ri, row_vals in enumerate(sorted_rows, 3):
         bg = ALT if ri % 2 == 1 else "FFFFFF"
-        upside_val = row_vals[8] if len(row_vals) > 8 else 0
 
         for ci, val in enumerate(row_vals, 1):
             c = ws.cell(row=ri, column=ci, value=val)
@@ -1129,7 +1136,7 @@ def update_summary_sheet(wb, d: dict):
             )
 
             # Колонка "Потенциал%" — цветная
-            if ci == 9:
+            if ci == upside_idx + 1:
                 if isinstance(val, (int, float)) and val > 0:
                     c.fill = PatternFill("solid", fgColor=GREEN_LIGHT)
                     c.font = Font(bold=True, color="1D5C3A", size=10)
@@ -1139,7 +1146,7 @@ def update_summary_sheet(wb, d: dict):
                 else:
                     c.fill = PatternFill("solid", fgColor=bg)
             # Колонка "Справедл." — зелёная
-            elif ci == 8:
+            elif ci == fair_idx + 1:
                 c.fill = PatternFill("solid", fgColor=GREEN_LIGHT)
                 c.font = Font(bold=True, color="1D5C3A", size=10)
             else:
