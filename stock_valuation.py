@@ -284,7 +284,8 @@ def fetch_smartlab(ticker: str, verbose: bool = True) -> dict:
         return 0.0
 
     eps  = last_val([r'\bEPS\b', r'Прибыль на акцию'])
-    bvps = last_val([r'\bBV\b', r'Балансовая стоимость.*акц', r'Book value per share'])
+    bvps = last_val([r'BV/акц', r'\bBV\b', r'Балансовая стоимость.*акц',
+                     r'Баланс стоимость', r'Book value per share'])
     roe  = last_val([r'\bROE\b'])
     if roe > 1:      # smart-lab отдаёт в процентах (24.5, а не 0.245)
         roe /= 100
@@ -297,8 +298,27 @@ def fetch_smartlab(ticker: str, verbose: bool = True) -> dict:
     de_ratio  = last_val([r'Долг/Капитал', r'D/E', r'Debt.*Equity'])
     if de_ratio > 10:   # smart-lab может давать в процентах
         de_ratio /= 100
-    shares    = last_val([r'Кол.*акций', r'Shares', r'Число акций'])
+    shares    = last_val([r'Число акций ао', r'Кол.*акций', r'Shares',
+                          r'Число акций'])
+    equity    = last_val([r'^Капитал$', r'^Чистые активы$', r'Equity'])
     net_profit = last_val([r'Чистая прибыль', r'Net Profit', r'Net Income'])
+    pb_ratio  = last_val([r'P/BV', r'P/B\b'])
+
+    # Фолбэк BVPS: из Капитала/акций или P/BV
+    if bvps == 0 and equity > 0 and shares > 0:
+        bvps = equity / shares
+        if verbose:
+            print(f"  ℹ BVPS рассчитан: Капитал({equity:.0f}) / Акции({shares:.0f}) = {bvps:.2f}₽")
+    if bvps == 0 and pb_ratio > 0:
+        # Попробуем получить цену для расчёта BVPS = Price / P/B
+        try:
+            price_for_bv = moex_price(ticker_clean)
+            if price_for_bv > 0:
+                bvps = price_for_bv / pb_ratio
+                if verbose:
+                    print(f"  ℹ BVPS рассчитан: Цена({price_for_bv:.2f}) / P/BV({pb_ratio:.2f}) = {bvps:.2f}₽")
+        except Exception:
+            pass
 
     # Рост дивидендов g — считаем из истории дивидендов на странице
     g = 0.08
@@ -496,6 +516,67 @@ def moex_name(ticker: str) -> str:
     except Exception:
         pass
     return ticker
+
+
+def _moex_candles(engine, market, board, sec, start, end):
+    """Загружает все свечи с MOEX ISS (с пагинацией), возвращает {date: close}."""
+    url = (f"{MOEX_BASE}/engines/{engine}/markets/{market}/boards/{board}/"
+           f"securities/{sec}/candles.json")
+    result = {}
+    cursor = 0
+    while True:
+        data = moex_get(url, {"from": start, "till": end,
+                               "interval": 24, "start": cursor})
+        added = 0
+        for block in data:
+            if not isinstance(block, dict):
+                continue
+            for row in block.get("candles", []):
+                c = safe(row.get("close") or row.get("CLOSE"))
+                dt = (row.get("begin") or row.get("BEGIN") or "")[:10]
+                if c > 0 and dt:
+                    result[dt] = c
+                    added += 1
+        if added == 0:
+            break
+        cursor += added
+    return result
+
+
+def calc_beta_moex(ticker: str, period_days: int = 365) -> float:
+    """Рассчитывает бету акции относительно IMOEX из дневных доходностей."""
+    end = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=period_days)).strftime("%Y-%m-%d")
+    try:
+        closes_s = _moex_candles("stock", "shares", "TQBR", ticker, start, end)
+        closes_m = _moex_candles("stock", "index", "SNDX", "IMOEX", start, end)
+
+        # Общие даты, отсортированные
+        common = sorted(set(closes_s) & set(closes_m))
+        if len(common) < 30:
+            return 1.0
+
+        prices_s = [closes_s[d] for d in common]
+        prices_m = [closes_m[d] for d in common]
+
+        # Дневные доходности
+        rs = [prices_s[i] / prices_s[i-1] - 1 for i in range(1, len(common))]
+        rm = [prices_m[i] / prices_m[i-1] - 1 for i in range(1, len(common))]
+
+        # beta = cov(rs, rm) / var(rm)
+        n = len(rs)
+        mean_s = sum(rs) / n
+        mean_m = sum(rm) / n
+        cov = sum((rs[i] - mean_s) * (rm[i] - mean_m) for i in range(n)) / n
+        var_m = sum((rm[i] - mean_m) ** 2 for i in range(n)) / n
+        if var_m == 0:
+            return 1.0
+        beta = cov / var_m
+        beta = max(0.1, min(beta, 3.0))
+        return round(beta, 3)
+    except Exception as e:
+        print(f"  ⚠ calc_beta_moex: {e}")
+        return 1.0
 
 
 # ────────────────────────────────────────────────────────────────
