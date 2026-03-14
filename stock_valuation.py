@@ -793,11 +793,19 @@ def pe_price(d: dict) -> float:
 
 
 def riv_price(d: dict) -> float:
-    """Residual Income Valuation: P = BVPS + PV остаточных доходов.""";
+    """Residual Income Valuation: P = BVPS + Σ PV(RI_t).
+    RI_t = (ROE − k) × BVPS × (1+g_riv)^t, g_riv = min(g, 20%)."""
     bvps = d["bvps"]
-    if bvps <= 0:
+    roe  = d.get("roe", 0.0)
+    k    = d["k"]
+    g    = d.get("g", 0.0)
+    if bvps <= 0 or k <= 0:
         return 0.0
-    return bvps + d["pv_ri"]
+    g_riv = min(g, 0.20)
+    T     = 5
+    ri_0  = (roe - k) * bvps
+    pv_ri = sum(ri_0 * (1 + g_riv)**t / (1 + k)**t for t in range(1, T + 1))
+    return bvps + pv_ri
 
 
 def dcf_price(d: dict) -> float:
