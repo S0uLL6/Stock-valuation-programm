@@ -51,10 +51,28 @@ def _load_config():
             pass
 
 def _save_config():
+    data = {k: v for k, v in CONFIG.items()
+            if k not in ("sector_pe", "sector_pe_ts")}
+    if sv._LIVE_SECTOR_PE:
+        data["sector_pe"] = dict(sv._LIVE_SECTOR_PE)
+        data["sector_pe_ts"] = datetime.now().isoformat()
     with open(_CONFIG_PATH, "w") as f:
-        json.dump(CONFIG, f, indent=2)
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def _apply_sector_pe_cache():
+    """Применяет кеш отраслевых P/E из CONFIG в sv._LIVE_SECTOR_PE (если кеш < 24ч)."""
+    ts_str = CONFIG.get("sector_pe_ts")
+    cached = CONFIG.get("sector_pe")
+    if ts_str and cached:
+        try:
+            ts = datetime.fromisoformat(ts_str)
+            if (datetime.now() - ts).total_seconds() < 86400:
+                sv._LIVE_SECTOR_PE.update(cached)
+        except Exception:
+            pass
 
 _load_config()
+_apply_sector_pe_cache()
 
 # ── Портфель (персистентность) ──────────────────────────────────
 _PORTFOLIO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portfolio_state.json")
@@ -2337,6 +2355,8 @@ class SettingsPage(ctk.CTkFrame):
 
     def _do_refresh_pe(self):
         data = fetch_sector_pe_live()
+        sv._LIVE_SECTOR_PE.update(data)
+        _save_config()
         self.after(0, lambda: self._fill_pe(data))
 
     def _fill_pe(self, data: dict):
@@ -2649,10 +2669,16 @@ class App(ctk.CTk):
         # Автозагрузка отраслевых P/E при старте
         threading.Thread(target=self._refresh_sector_pe, daemon=True).start()
 
-    def _refresh_sector_pe(self):
-        """Фоновый поток: загружает актуальные отраслевые P/E и обновляет UI."""
+    def _refresh_sector_pe(self, force: bool = False):
+        """Фоновый поток: загружает актуальные отраслевые P/E и обновляет UI.
+        Если кеш свежее 24ч — пропускает fetch (если force=False)."""
         try:
+            if not force and sv._LIVE_SECTOR_PE:
+                self.after(0, lambda: self.settings_page._fill_pe(sv._LIVE_SECTOR_PE))
+                return
             data = fetch_sector_pe_live()
+            sv._LIVE_SECTOR_PE.update(data)
+            _save_config()
             self.after(0, lambda: self.settings_page._fill_pe(data))
         except Exception:
             pass
